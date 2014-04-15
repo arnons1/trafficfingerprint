@@ -1,0 +1,3575 @@
+Index: dpkt/udp.py
+===================================================================
+--- dpkt/udp.py	(revision 82)
++++ dpkt/udp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """User Datagram Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ UDP_PORT_MAX	= 65535
+ 
+Index: dpkt/rx.py
+===================================================================
+--- dpkt/rx.py	(revision 82)
++++ dpkt/rx.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Rx Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ # Types
+ DATA                    = 0x01
+Index: dpkt/loopback.py
+===================================================================
+--- dpkt/loopback.py	(revision 82)
++++ dpkt/loopback.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Platform-dependent loopback header."""
+ 
+-import dpkt, ethernet, ip, ip6
++from . import dpkt, ethernet, ip, ip6
+ 
+ class Loopback(dpkt.Packet):
+     __hdr__ = (('family', 'I', 0), )
+Index: dpkt/ip6.py
+===================================================================
+--- dpkt/ip6.py	(revision 82)
++++ dpkt/ip6.py	(working copy)
+@@ -2,11 +2,11 @@
+ 
+ """Internet Protocol, version 6."""
+ 
+-import dpkt
++from . import dpkt, compat
+ 
+ class IP6(dpkt.Packet):
+     __hdr__ = (
+-        ('v_fc_flow', 'I', 0x60000000L),
++        ('v_fc_flow', 'I', 0x60000000),
+         ('plen', 'H', 0),	# payload length (not including header)
+         ('nxt', 'B', 0),	# next header protocol
+         ('hlim', 'B', 0),	# hop limit
+@@ -18,13 +18,13 @@
+     def _get_v(self):
+         return self.v_fc_flow >> 28
+     def _set_v(self, v):
+-        self.v_fc_flow = (self.v_fc_flow & ~0xf0000000L) | (v << 28)
++        self.v_fc_flow = (self.v_fc_flow & ~0xf0000000) | (v << 28)
+     v = property(_get_v, _set_v)
+ 
+     def _get_fc(self):
+         return (self.v_fc_flow >> 20) & 0xff
+     def _set_fc(self, v):
+-        self.v_fc_flow = (self.v_fc_flow & ~0xff00000L) | (v << 20)
++        self.v_fc_flow = (self.v_fc_flow & ~0xff00000) | (v << 20)
+     fc = property(_get_fc, _set_fc)
+ 
+     def _get_flow(self):
+@@ -61,19 +61,21 @@
+         Output extension headers in order defined in RFC1883 (except dest opts)
+         """
+         
+-        header_str = ""
++        header_str = b""
+         
+         for hdr in ext_hdrs:
+             if not self.extension_hdrs[hdr] is None:
+-                header_str += str(self.extension_hdrs[hdr])
++                header_str += self.extension_hdrs[hdr]
+         return header_str
+-        
+ 
+     def __str__(self):
++        return str(self.__bytes__())
++
++    def __bytes__(self):
+         if (self.nxt == 6 or self.nxt == 17 or self.nxt == 58) and \
+                not self.data.sum:
+             # XXX - set TCP, UDP, and ICMPv6 checksums
+-            p = str(self.data)
++            p = bytes(self.data)
+             s = dpkt.struct.pack('>16s16sxBH', self.src, self.dst, self.nxt, len(p))
+             s = dpkt.in_cksum_add(0, s)
+             s = dpkt.in_cksum_add(s, p)
+@@ -81,7 +83,7 @@
+                 self.data.sum = dpkt.in_cksum_done(s)
+             except AttributeError:
+                 pass
+-        return self.pack_hdr() + self.headers_str() + str(self.data)
++        return self.pack_hdr() + self.headers_str() + bytes(self.data)
+ 
+     def set_proto(cls, p, pktclass):
+         cls._protosw[p] = pktclass
+@@ -92,7 +94,7 @@
+     get_proto = classmethod(get_proto)
+ 
+ # XXX - auto-load IP6 dispatch table from IP dispatch table
+-import ip
++from . import ip
+ IP6._protosw.update(ip.IP._protosw)
+ 
+ class IP6ExtensionHeader(dpkt.Packet): 
+@@ -116,14 +118,14 @@
+         index = 0
+         
+         while (index < self.length - 2):
+-            opt_type = ord(self.data[index])
++            opt_type = compat.compat_ord(self.data[index])
+             
+             # PAD1 option
+             if opt_type == 0:                    
+                 index += 1
+                 continue;
+             
+-            opt_length = ord(self.data[index + 1])
++            opt_length = compat.compat_ord(self.data[index + 1])
+             
+             if opt_type == 1: # PADN option
+                 # PADN uses opt_length bytes in total
+@@ -231,19 +233,19 @@
+     class IP6TestCase(unittest.TestCase):
+         
+         def test_IP6(self):
+-            s = '`\x00\x00\x00\x00(\x06@\xfe\x80\x00\x00\x00\x00\x00\x00\x02\x11$\xff\xfe\x8c\x11\xde\xfe\x80\x00\x00\x00\x00\x00\x00\x02\xb0\xd0\xff\xfe\xe1\x80r\xcd\xca\x00\x16\x04\x84F\xd5\x00\x00\x00\x00\xa0\x02\xff\xff\xf8\t\x00\x00\x02\x04\x05\xa0\x01\x03\x03\x00\x01\x01\x08\n}\x185?\x00\x00\x00\x00'
++            s = b'`\x00\x00\x00\x00(\x06@\xfe\x80\x00\x00\x00\x00\x00\x00\x02\x11$\xff\xfe\x8c\x11\xde\xfe\x80\x00\x00\x00\x00\x00\x00\x02\xb0\xd0\xff\xfe\xe1\x80r\xcd\xca\x00\x16\x04\x84F\xd5\x00\x00\x00\x00\xa0\x02\xff\xff\xf8\t\x00\x00\x02\x04\x05\xa0\x01\x03\x03\x00\x01\x01\x08\n}\x185?\x00\x00\x00\x00'
+             ip = IP6(s)
+             #print `ip`
+             ip.data.sum = 0
+-            s2 = str(ip)
++            s2 = bytes(ip)
+             ip2 = IP6(s)
+             #print `ip2`
+             assert(s == s2)
+             
+         def test_IP6RoutingHeader(self):
+-            s = '`\x00\x00\x00\x00<+@ H\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xde\xca G\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xca\xfe\x06\x04\x00\x02\x00\x00\x00\x00 \x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xde\xca "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xde\xca\x00\x14\x00P\x00\x00\x00\x00\x00\x00\x00\x00P\x02 \x00\x91\x7f\x00\x00'
++            s = b'`\x00\x00\x00\x00<+@ H\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xde\xca G\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xca\xfe\x06\x04\x00\x02\x00\x00\x00\x00 \x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xde\xca "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xde\xca\x00\x14\x00P\x00\x00\x00\x00\x00\x00\x00\x00P\x02 \x00\x91\x7f\x00\x00'
+             ip = IP6(s)
+-            s2 = str(ip)
++            s2 = bytes(ip)
+             # 43 is Routing header id
+             assert(len(ip.extension_hdrs[43].addresses) == 2)
+             assert(ip.tcp)
+@@ -251,21 +253,21 @@
+             
+             
+         def test_IP6FragmentHeader(self):
+-            s = '\x06\xee\xff\xfb\x00\x00\xff\xff'
++            s = b'\x06\xee\xff\xfb\x00\x00\xff\xff'
+             fh = IP6FragmentHeader(s)
+-            s2 = str(fh)
++            s2 = bytes(fh)
+             assert(fh.nxt == 6)
+             assert(fh.id == 65535)
+             assert(fh.frag_off == 8191)
+             assert(fh.m_flag == 1)
+             
+         def test_IP6OptionsHeader(self):
+-            s = ';\x04\x01\x02\x00\x00\xc9\x10\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\xc2\x04\x00\x00\x00\x00\x05\x02\x00\x00\x01\x02\x00\x00'
++            s = b';\x04\x01\x02\x00\x00\xc9\x10\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\xc2\x04\x00\x00\x00\x00\x05\x02\x00\x00\x01\x02\x00\x00'
+             options = IP6OptsHeader(s).options
+             assert(len(options) == 3)
+             
+         def test_IP6AHHeader(self):
+-            s = ';\x04\x00\x00\x02\x02\x02\x02\x01\x01\x01\x01\x78\x78\x78\x78\x78\x78\x78\x78'
++            s = b';\x04\x00\x00\x02\x02\x02\x02\x01\x01\x01\x01\x78\x78\x78\x78\x78\x78\x78\x78'
+             ah = IP6AHHeader(s)
+             assert(ah.length == 24)
+             assert(ah.auth_data == 'xxxxxxxx')
+Index: dpkt/__init__.py
+===================================================================
+--- dpkt/__init__.py	(revision 82)
++++ dpkt/__init__.py	(working copy)
+@@ -8,64 +9,64 @@
+ __url__ = 'http://dpkt.googlecode.com/'
+ __version__ = '1.7'
+ 
+-from dpkt import *
++from .dpkt import *
+ 
+-import ah
+-import aim
+-import arp
+-import asn1
+-import bgp
+-import cdp
+-import dhcp
+-import diameter
+-import dns
+-import dtp
+-import esp
+-import ethernet
+-import gre
+-import gzip
+-import h225
+-import hsrp
+-import http
+-import icmp
+-import icmp6
+-import ieee80211
+-import igmp
+-import ip
+-import ip6
+-import ipx
+-import loopback
+-import mrt
+-import netbios
+-import netflow
+-import ntp
+-import ospf
+-import pcap
+-import pim
+-import pmap
+-import ppp
+-import pppoe
+-import qq
+-import radiotap
+-import radius
+-import rfb
+-import rip
+-import rpc
+-import rtp
+-import rx
+-import sccp
+-import sctp
+-import sip
+-import sll
+-import smb
+-import ssl
+-import stp
+-import stun
+-import tcp
+-import telnet
+-import tftp
+-import tns
+-import tpkt
+-import udp
+-import vrrp
+-import yahoo
++from . import ah
++from . import aim
++from . import arp
++from . import asn1
++from . import bgp
++from . import cdp
++from . import dhcp
++from . import diameter
++from . import dns
++from . import dtp
++from . import esp
++from . import ethernet
++from . import gre
++from . import gzip
++from . import h225
++from . import hsrp
++from . import http
++from . import icmp
++from . import icmp6
++from . import ieee80211
++from . import igmp
++from .ip import IP
++from . import ip6
++from . import ipx
++from . import loopback
++from . import mrt
++from . import netbios
++from . import netflow
++from . import ntp
++from . import ospf
++from . import pcap
++from . import pim
++from . import pmap
++from . import ppp
++from . import pppoe
++from . import qq
++from . import radiotap
++from . import radius
++from . import rfb
++from . import rip
++from . import rpc
++from . import rtp
++from . import rx
++from . import sccp
++from . import sctp
++from . import sip
++from . import sll
++from . import smb
++from . import ssl
++from . import stp
++from . import stun
++from . import tcp
++from . import telnet
++from . import tftp
++from . import tns
++from . import tpkt
++from . import udp
++from . import vrrp
++from . import yahoo
+Index: dpkt/ipx.py
+===================================================================
+--- dpkt/ipx.py	(revision 82)
++++ dpkt/ipx.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Internetwork Packet Exchange."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ IPX_HDR_LEN = 30
+ 
+Index: dpkt/asn1.py
+===================================================================
+--- dpkt/asn1.py	(revision 82)
++++ dpkt/asn1.py	(working copy)
+@@ -3,7 +3,7 @@
+ """Abstract Syntax Notation #1."""
+ 
+ import struct, time
+-import dpkt
++from . import dpkt, compat
+ 
+ # Type class
+ CLASSMASK    = 0xc0
+@@ -56,10 +56,10 @@
+     """
+     msg = []
+     while buf:
+-        t = ord(buf[0])
++        t = compat.compat_ord((buf[0]))
+         constructed = t & CONSTRUCTED
+         tag = t & TAGMASK
+-        l = ord(buf[1])
++        l = compat.compat_ord(buf[1])
+         c = 0
+         if constructed and l == 128:
+             # XXX - constructed, indefinite length
+@@ -67,7 +67,7 @@
+         elif l >= 128:
+             c = l & 127
+             if c == 1:
+-                l = ord(buf[2])
++                l = compat.compat_ord(buf[2])
+             elif c == 2:
+                 l = struct.unpack('>H', buf[2:4])[0]
+             elif c == 3:
+@@ -89,7 +89,7 @@
+             if l == 0:
+                 n = 0
+             elif l == 1:
+-                n = ord(buf[0])
++                n = compat.compat_ord(buf[0])
+             elif l == 2:
+                 n = struct.unpack('>H', buf[:2])[0]
+             elif l == 3:
+@@ -113,7 +113,7 @@
+     
+     class ASN1TestCase(unittest.TestCase):
+         def test_asn1(self):
+-            s = '0\x82\x02Q\x02\x01\x0bc\x82\x02J\x04xcn=Douglas J Song 1, ou=Information Technology Division, ou=Faculty and Staff, ou=People, o=University of Michigan, c=US\n\x01\x00\n\x01\x03\x02\x01\x00\x02\x01\x00\x01\x01\x00\x87\x0bobjectclass0\x82\x01\xb0\x04\rmemberOfGroup\x04\x03acl\x04\x02cn\x04\x05title\x04\rpostalAddress\x04\x0ftelephoneNumber\x04\x04mail\x04\x06member\x04\thomePhone\x04\x11homePostalAddress\x04\x0bobjectClass\x04\x0bdescription\x04\x18facsimileTelephoneNumber\x04\x05pager\x04\x03uid\x04\x0cuserPassword\x04\x08joinable\x04\x10associatedDomain\x04\x05owner\x04\x0erfc822ErrorsTo\x04\x08ErrorsTo\x04\x10rfc822RequestsTo\x04\nRequestsTo\x04\tmoderator\x04\nlabeledURL\x04\nonVacation\x04\x0fvacationMessage\x04\x05drink\x04\x0elastModifiedBy\x04\x10lastModifiedTime\x04\rmodifiersname\x04\x0fmodifytimestamp\x04\x0ccreatorsname\x04\x0fcreatetimestamp'
+-            self.failUnless(decode(s) == [(48, [(2, 11), (99, [(4, 'cn=Douglas J Song 1, ou=Information Technology Division, ou=Faculty and Staff, ou=People, o=University of Michigan, c=US'), (10, '\x00'), (10, '\x03'), (2, 0), (2, 0), (1, '\x00'), (135, 'objectclass'), (48, [(4, 'memberOfGroup'), (4, 'acl'), (4, 'cn'), (4, 'title'), (4, 'postalAddress'), (4, 'telephoneNumber'), (4, 'mail'), (4, 'member'), (4, 'homePhone'), (4, 'homePostalAddress'), (4, 'objectClass'), (4, 'description'), (4, 'facsimileTelephoneNumber'), (4, 'pager'), (4, 'uid'), (4, 'userPassword'), (4, 'joinable'), (4, 'associatedDomain'), (4, 'owner'), (4, 'rfc822ErrorsTo'), (4, 'ErrorsTo'), (4, 'rfc822RequestsTo'), (4, 'RequestsTo'), (4, 'moderator'), (4, 'labeledURL'), (4, 'onVacation'), (4, 'vacationMessage'), (4, 'drink'), (4, 'lastModifiedBy'), (4, 'lastModifiedTime'), (4, 'modifiersname'), (4, 'modifytimestamp'), (4, 'creatorsname'), (4, 'createtimestamp')])])])])
++            s = b'0\x82\x02Q\x02\x01\x0bc\x82\x02J\x04xcn=Douglas J Song 1, ou=Information Technology Division, ou=Faculty and Staff, ou=People, o=University of Michigan, c=US\n\x01\x00\n\x01\x03\x02\x01\x00\x02\x01\x00\x01\x01\x00\x87\x0bobjectclass0\x82\x01\xb0\x04\rmemberOfGroup\x04\x03acl\x04\x02cn\x04\x05title\x04\rpostalAddress\x04\x0ftelephoneNumber\x04\x04mail\x04\x06member\x04\thomePhone\x04\x11homePostalAddress\x04\x0bobjectClass\x04\x0bdescription\x04\x18facsimileTelephoneNumber\x04\x05pager\x04\x03uid\x04\x0cuserPassword\x04\x08joinable\x04\x10associatedDomain\x04\x05owner\x04\x0erfc822ErrorsTo\x04\x08ErrorsTo\x04\x10rfc822RequestsTo\x04\nRequestsTo\x04\tmoderator\x04\nlabeledURL\x04\nonVacation\x04\x0fvacationMessage\x04\x05drink\x04\x0elastModifiedBy\x04\x10lastModifiedTime\x04\rmodifiersname\x04\x0fmodifytimestamp\x04\x0ccreatorsname\x04\x0fcreatetimestamp'
++            self.assertTrue(decode(s) == [(48, [(2, 11), (99, [(4, b'cn=Douglas J Song 1, ou=Information Technology Division, ou=Faculty and Staff, ou=People, o=University of Michigan, c=US'), (10, b'\x00'), (10, b'\x03'), (2, 0), (2, 0), (1, b'\x00'), (135, b'objectclass'), (48, [(4, b'memberOfGroup'), (4, b'acl'), (4, b'cn'), (4, b'title'), (4, b'postalAddress'), (4, b'telephoneNumber'), (4, b'mail'), (4, b'member'), (4, b'homePhone'), (4, b'homePostalAddress'), (4, b'objectClass'), (4, b'description'), (4, b'facsimileTelephoneNumber'), (4, b'pager'), (4, b'uid'), (4, b'userPassword'), (4, b'joinable'), (4, b'associatedDomain'), (4, b'owner'), (4, b'rfc822ErrorsTo'), (4, b'ErrorsTo'), (4, b'rfc822RequestsTo'), (4, b'RequestsTo'), (4, b'moderator'), (4, b'labeledURL'), (4, b'onVacation'), (4, b'vacationMessage'), (4, b'drink'), (4, b'lastModifiedBy'), (4, b'lastModifiedTime'), (4, b'modifiersname'), (4, b'modifytimestamp'), (4, b'creatorsname'), (4, b'createtimestamp')])])])])
+ 
+     unittest.main()
+Index: dpkt/mrt.py
+===================================================================
+--- dpkt/mrt.py	(revision 82)
++++ dpkt/mrt.py	(working copy)
+@@ -2,8 +2,8 @@
+ 
+ """Multi-threaded Routing Toolkit."""
+ 
+-import dpkt
+-import bgp
++from . import dpkt
++from . import bgp
+ 
+ # Multi-threaded Routing Toolkit
+ # http://www.ietf.org/internet-drafts/draft-ietf-grow-mrt-03.txt
+Index: dpkt/ieee80211.py
+===================================================================
+--- dpkt/ieee80211.py	(revision 82)
++++ dpkt/ieee80211.py	(working copy)
+@@ -130,4 +130,4 @@
+     class IEEE80211TestCase(unittest.TestCase):
+         def test_802211(self):
+-            s = '\xd4\x00\x00\x00\x00\x12\xf0\xb6\x1c\xa4'
++            s = b'\xd4\x00\x00\x00\x00\x12\xf0\xb6\x1c\xa4'
+             ieee = IEEE80211(s)
+Index: dpkt/netbios.py
+===================================================================
+--- dpkt/netbios.py	(revision 82)
++++ dpkt/netbios.py	(working copy)
+@@ -3,16 +3,16 @@
+ """Network Basic Input/Output System."""
+ 
+ import struct
+-import dpkt, dns
++from . import dpkt, dns, compat
+ 
+ def encode_name(name):
+     """Return the NetBIOS first-level encoded name."""
+     l = []
+     for c in struct.pack('16s', name):
+-        c = ord(c)
++        c = compat.compat_ord(c)
+         l.append(chr((c >> 4) + 0x41))
+         l.append(chr((c & 0xf) + 0x41))
+-    return ''.join(l)
++    return b''.join(l)
+ 
+ def decode_name(nbname):
+     """Return the NetBIOS first-level decoded nbname."""
+@@ -20,9 +20,9 @@
+         return nbname
+     l = []
+     for i in range(0, 32, 2):
+-        l.append(chr(((ord(nbname[i]) - 0x41) << 4) |
+-                     ((ord(nbname[i+1]) - 0x41) & 0xf)))
+-    return ''.join(l).split('\x00', 1)[0]
++        l.append(chr(((compat.compat_ord(nbname[i]) - 0x41) << 4) |
++                     ((compat.compat_ord(nbname[i+1]) - 0x41) & 0xf)))
++    return b''.join(l).split('\x00', 1)[0]
+ 
+ # RR types
+ NS_A		= 0x01	# IP address
+@@ -77,7 +77,8 @@
+     (0xBE, 1):[ ('', 'Network Monitor Agent') ],
+     (0xBF, 1):[ ('', 'Network Monitor Application') ]
+     }
+-def node_to_service_name((name, service, flags)):
++def node_to_service_name(xxx_todo_changeme):
++    (name, service, flags) = xxx_todo_changeme
+     try:
+         unique = int(flags & NS_NAME_G == 0)
+         for namepfx, svcname in nbstat_svcs[(service, unique)]:
+@@ -98,12 +99,12 @@
+             if self.type == NS_A:
+                 self.ip = self.rdata
+             elif self.type == NS_NBSTAT:
+-                num = ord(self.rdata[0])
++                num = compat.compat_ord(self.rdata[0])
+                 off = 1
+                 l = []
+                 for i in range(num):
+                     name = self.rdata[off:off+15].split(None, 1)[0].split('\x00', 1)[0]
+-                    service = ord(self.rdata[off+15])
++                    service = compat.compat_ord(self.rdata[off+15])
+                     off += 16
+                     flags = struct.unpack('>H', self.rdata[off:off+2])[0]
+                     off += 2
+Index: dpkt/tns.py
+===================================================================
+--- dpkt/tns.py	(revision 82)
++++ dpkt/tns.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Transparent Network Substrate."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ class TNS(dpkt.Packet):
+     __hdr__ = (
+Index: dpkt/bgp.py
+===================================================================
+--- dpkt/bgp.py	(revision 82)
++++ dpkt/bgp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Border Gateway Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ import struct, socket
+ 
+ # Border Gateway Protocol 4 - RFC 4271
+@@ -48,10 +48,10 @@
+ AS_CONFED_SET			= 4
+ 
+ # Reserved Communities Types
+-NO_EXPORT			= 0xffffff01L
+-NO_ADVERTISE			= 0xffffff02L
+-NO_EXPORT_SUBCONFED		= 0xffffff03L
+-NO_PEER				= 0xffffff04L
++NO_EXPORT			= 0xffffff01
++NO_ADVERTISE			= 0xffffff02
++NO_EXPORT_SUBCONFED		= 0xffffff03
++NO_PEER				= 0xffffff04
+ 
+ # Common AFI types
+ AFI_IPV4			= 1
+@@ -165,7 +165,10 @@
+                    sum(map(len, self.parameters))
+ 
+         def __str__(self):
+-            params = ''.join(map(str, self.parameters))
++            return str(self.__bytes__())
++
++        def __bytes__(self):
++            params = b''.join(map(bytes, self.parameters))
+             self.param_len = len(params)
+             return self.pack_hdr() + params
+ 
+@@ -246,11 +249,14 @@
+                    sum(map(len, self.announced))
+ 
+         def __str__(self):
++            return str(self.__bytes__())
++
++        def __bytes__(self):
+             return struct.pack('>H', sum(map(len, self.withdrawn))) + \
+-                   ''.join(map(str, self.withdrawn)) + \
++                   b''.join(map(bytes, self.withdrawn)) + \
+                    struct.pack('>H', sum(map(len, self.attributes))) + \
+-                   ''.join(map(str, self.attributes)) + \
+-                   ''.join(map(str, self.announced))
++                   b''.join(map(bytes, self.attributes)) + \
++                   b''.join(map(bytes, self.announced))
+ 
+         class Attribute(dpkt.Packet):
+             __hdr__ = (
+@@ -329,13 +335,16 @@
+                        len(self.data)
+ 
+             def __str__(self):
++                return str(self.__bytes__())
++
++            def __bytes__(self):
+                 if self.extended_length:
+                     attr_len_str = struct.pack('>H', self.len)
+                 else:
+                     attr_len_str = struct.pack('B', self.len)
+                 return self.pack_hdr() + \
+                        attr_len_str + \
+-                       str(self.data)
++                       bytes(self.data)
+ 
+             class Origin(dpkt.Packet):
+                 __hdr__ = (
+@@ -360,7 +369,10 @@
+                     return sum(map(len, self.data))
+ 
+                 def __str__(self):
+-                    return ''.join(map(str, self.data))
++                    return str(self.__bytes__())
++
++                def __bytes__(self):
++                    return b''.join(map(bytes, self.data))
+  
+                 class ASPathSegment(dpkt.Packet):
+                     __hdr__ = (
+@@ -382,7 +394,10 @@
+                                2 * len(self.path)
+ 
+                     def __str__(self):
+-                        as_str = ''
++                        return str(self.__bytes__())
++
++                    def __bytes__(self):
++                        as_str = b''
+                         for AS in self.path:
+                             as_str += struct.pack('>H', AS)
+                         return self.pack_hdr() + \
+@@ -413,6 +428,9 @@
+                 def __str__(self):
+                     return ''
+ 
++                def __bytes__(self):
++                    return b''
++
+             class Aggregator(dpkt.Packet):
+                 __hdr__ = (
+                     ('asn', 'H', 0),
+@@ -429,8 +447,8 @@
+                     l = []
+                     while self.data:
+                         val = struct.unpack('>I', self.data[:4])[0]
+-                        if (val >= 0x00000000L and val <= 0x0000ffffL) or \
+-                           (val >= 0xffff0000L and val <= 0xffffffffL):
++                        if (val >= 0x00000000 and val <= 0x0000ffff) or \
++                           (val >= 0xffff0000 and val <= 0xffffffff):
+                             comm = self.ReservedCommunity(self.data[:4])
+                         else:
+                             comm = self.Community(self.data[:4])
+@@ -442,8 +460,11 @@
+                     return sum(map(len, self.data))
+ 
+                 def __str__(self):
+-                    return ''.join(map(str, self.data))
++                    return str(self.__bytes__())
+ 
++                def __bytes__(self):
++                    return b''.join(map(bytes, self.data))
++
+                 class Community(dpkt.Packet):
+                     __hdr__ = (
+                         ('asn', 'H', 0),
+@@ -478,7 +499,10 @@
+                     return 4 * len(self.list)
+ 
+                 def __str__(self):
+-                    cluster_str = ''
++                    return str(self.__bytes__())
++
++                def __bytes__(self):
++                    cluster_str = b''
+                     for val in self.list:
+                             cluster_str += struct.pack('>I', val)
+                     return cluster_str
+@@ -530,12 +554,15 @@
+                            sum(map(len, self.announced))
+ 
+                 def __str__(self):
++                    return str(self.__bytes__())
++
++                def __bytes__(self):
+                     return self.pack_hdr() + \
+                            struct.pack('B', len(self.next_hop)) + \
+-                           str(self.next_hop) + \
++                           bytes(self.next_hop) + \
+                            struct.pack('B', len(self.snpas)) + \
+-                           ''.join(map(str, self.snpas)) + \
+-                           ''.join(map(str, self.announced))
++                           b''.join(map(bytes, self.snpas)) + \
++                           b''.join(map(bytes, self.announced))
+ 
+                 class SNPA:
+                     __hdr__ = (
+@@ -544,7 +571,7 @@
+ 
+                     def unpack(self, buf):
+                         dpkt.Packet.unpack(self, buf)
+-                        self.data = self.data[:(self.len + 1) / 2]
++                        self.data = self.data[:int((self.len + 1) / 2)]
+ 
+             class MPUnreachNLRI(dpkt.Packet):
+                 __hdr__ = (
+@@ -575,8 +602,11 @@
+                            sum(map(len, self.data))
+ 
+                 def __str__(self):
++                    return str(self.__bytes__())
++
++                def __bytes__(self):
+                     return self.pack_hdr() + \
+-                           ''.join(map(str, self.data))
++                           b''.join(map(bytes, self.data))
+ 
+ 
+     class Notification(dpkt.Packet):
+@@ -600,7 +630,10 @@
+         def __str__(self):
+             return ''
+ 
++        def __bytes__(self):
++            return b''
+ 
++
+     class RouteRefresh(dpkt.Packet):
+         __hdr__ = (
+             ('afi', 'H', AFI_IPV4),
+@@ -616,7 +649,7 @@
+ 
+     def unpack(self, buf):
+         dpkt.Packet.unpack(self, buf)
+-        self.data = self.prefix = self.data[:(self.len + 7) / 8]
++        self.data = self.prefix = self.data[:int((self.len + 7) / 8)]
+ 
+ class RouteIPV4(dpkt.Packet):
+     __hdr__ = (
+@@ -625,8 +658,8 @@
+ 
+     def unpack(self, buf):
+         dpkt.Packet.unpack(self, buf)
+-        tmp = self.data[:(self.len + 7) / 8]
+-        tmp += (4 - len(tmp)) * '\x00'
++        tmp = self.data[:int((self.len + 7) / 8)]
++        tmp += (4 - len(tmp)) * b'\x00'
+         self.data = self.prefix = tmp
+ 
+     def __repr__(self):
+@@ -635,11 +668,14 @@
+ 
+     def __len__(self):
+         return self.__hdr_len__ + \
+-               (self.len + 7) / 8
++               int((self.len + 7) / 8)
+ 
+     def __str__(self):
++        return str(self.__bytes__())
++
++    def __bytes__(self):
+         return self.pack_hdr() + \
+-               self.prefix[:(self.len + 7) / 8]
++               self.prefix[:int((self.len + 7) / 8)]
+ 
+ class RouteIPV6(dpkt.Packet):
+     __hdr__ = (
+@@ -648,17 +684,20 @@
+ 
+     def unpack(self, buf):
+         dpkt.Packet.unpack(self, buf)
+-        tmp = self.data[:(self.len + 7) / 8]
++        tmp = self.data[:int((self.len + 7) / 8)]
+         tmp += (16 - len(tmp)) * '\x00'
+         self.data = self.prefix = tmp
+ 
+     def __len__(self):
+         return self.__hdr_len__ + \
+-               (self.len + 7) / 8
++               int((self.len + 7) / 8)
+ 
+     def __str__(self):
++        return str(self.__bytes__())
++
++    def __bytes__(self):
+         return self.pack_hdr() + \
+-               self.prefix[:(self.len + 7) / 8]
++               self.prefix[:int((self.len + 7) / 8)]
+ 
+ 
+ if __name__ == '__main__':
+@@ -667,94 +706,94 @@
+     class BGPTestCase(unittest.TestCase):
+         def testPack(self):
+             b1 = BGP(self.bgp1)
+-            self.failUnless(self.bgp1 == str(b1))
++            self.assertTrue(self.bgp1 == bytes(b1))
+             b2 = BGP(self.bgp2)
+-            self.failUnless(self.bgp2 == str(b2))
++            self.assertTrue(self.bgp2 == bytes(b2))
+             b3 = BGP(self.bgp3)
+-            self.failUnless(self.bgp3 == str(b3))
++            self.assertTrue(self.bgp3 == bytes(b3))
+             b4 = BGP(self.bgp4)
+-            self.failUnless(self.bgp4 == str(b4))
++            self.assertTrue(self.bgp4 == bytes(b4))
+ 
+         def testUnpack(self):
+             b1 = BGP(self.bgp1)
+-            self.failUnless(b1.len == 19)
+-            self.failUnless(b1.type == KEEPALIVE)
+-            self.failUnless(b1.keepalive is not None)
++            self.assertTrue(b1.len == 19)
++            self.assertTrue(b1.type == KEEPALIVE)
++            self.assertTrue(b1.keepalive is not None)
+             
+             b2 = BGP(self.bgp2)
+-            self.failUnless(b2.type == UPDATE)
+-            self.failUnless(len(b2.update.withdrawn) == 0)
+-            self.failUnless(len(b2.update.announced) == 1)
+-            self.failUnless(len(b2.update.attributes) == 9)
++            self.assertTrue(b2.type == UPDATE)
++            self.assertTrue(len(b2.update.withdrawn) == 0)
++            self.assertTrue(len(b2.update.announced) == 1)
++            self.assertTrue(len(b2.update.attributes) == 9)
+             a = b2.update.attributes[1]
+-            self.failUnless(a.type == AS_PATH)
+-            self.failUnless(a.len == 10)
+-            self.failUnless(len(a.as_path.segments) == 2)
++            self.assertTrue(a.type == AS_PATH)
++            self.assertTrue(a.len == 10)
++            self.assertTrue(len(a.as_path.segments) == 2)
+             s = a.as_path.segments[0]
+-            self.failUnless(s.type == AS_SET)
+-            self.failUnless(s.len == 2)
+-            self.failUnless(len(s.path) == 2)
+-            self.failUnless(s.path[0] == 500)
++            self.assertTrue(s.type == AS_SET)
++            self.assertTrue(s.len == 2)
++            self.assertTrue(len(s.path) == 2)
++            self.assertTrue(s.path[0] == 500)
+ 
+             a = b2.update.attributes[6]
+-            self.failUnless(a.type == COMMUNITIES)
+-            self.failUnless(a.len == 12)
+-            self.failUnless(len(a.communities.list) == 3)
++            self.assertTrue(a.type == COMMUNITIES)
++            self.assertTrue(a.len == 12)
++            self.assertTrue(len(a.communities.list) == 3)
+             c = a.communities.list[0]
+-            self.failUnless(c.asn == 65215)
+-            self.failUnless(c.value == 1)
++            self.assertTrue(c.asn == 65215)
++            self.assertTrue(c.value == 1)
+             r = b2.update.announced[0]
+-            self.failUnless(r.len == 22)
+-            self.failUnless(r.prefix == '\xc0\xa8\x04\x00')
++            self.assertTrue(r.len == 22)
++            self.assertTrue(r.prefix == b'\xc0\xa8\x04\x00')
+ 
+             b3 = BGP(self.bgp3)
+-            self.failUnless(b3.type == UPDATE)
+-            self.failUnless(len(b3.update.withdrawn) == 0)
+-            self.failUnless(len(b3.update.announced) == 0)
+-            self.failUnless(len(b3.update.attributes) == 6)
++            self.assertTrue(b3.type == UPDATE)
++            self.assertTrue(len(b3.update.withdrawn) == 0)
++            self.assertTrue(len(b3.update.announced) == 0)
++            self.assertTrue(len(b3.update.attributes) == 6)
+             a = b3.update.attributes[0]
+-            self.failUnless(a.optional == False)
+-            self.failUnless(a.transitive == True)
+-            self.failUnless(a.partial == False)
+-            self.failUnless(a.extended_length == False)
+-            self.failUnless(a.type == ORIGIN)
+-            self.failUnless(a.len == 1)
++            self.assertTrue(a.optional == False)
++            self.assertTrue(a.transitive == True)
++            self.assertTrue(a.partial == False)
++            self.assertTrue(a.extended_length == False)
++            self.assertTrue(a.type == ORIGIN)
++            self.assertTrue(a.len == 1)
+             o = a.origin
+-            self.failUnless(o.type == ORIGIN_IGP)
++            self.assertTrue(o.type == ORIGIN_IGP)
+             a = b3.update.attributes[5]
+-            self.failUnless(a.optional == True)
+-            self.failUnless(a.transitive == False)
+-            self.failUnless(a.partial == False)
+-            self.failUnless(a.extended_length == True)
+-            self.failUnless(a.type == MP_REACH_NLRI)
+-            self.failUnless(a.len == 30)
++            self.assertTrue(a.optional == True)
++            self.assertTrue(a.transitive == False)
++            self.assertTrue(a.partial == False)
++            self.assertTrue(a.extended_length == True)
++            self.assertTrue(a.type == MP_REACH_NLRI)
++            self.assertTrue(a.len == 30)
+             m = a.mp_reach_nlri
+-            self.failUnless(m.afi == AFI_IPV4)
+-            self.failUnless(len(m.snpas) == 0)
+-            self.failUnless(len(m.announced) == 1)
++            self.assertTrue(m.afi == AFI_IPV4)
++            self.assertTrue(len(m.snpas) == 0)
++            self.assertTrue(len(m.announced) == 1)
+             p = m.announced[0]
+-            self.failUnless(p.len == 96)
++            self.assertTrue(p.len == 96)
+ 
+             b4 = BGP(self.bgp4)
+-            self.failUnless(b4.len == 45)
+-            self.failUnless(b4.type == OPEN)
+-            self.failUnless(b4.open.asn == 237)
+-            self.failUnless(b4.open.param_len == 16)
+-            self.failUnless(len(b4.open.parameters) == 3)
++            self.assertTrue(b4.len == 45)
++            self.assertTrue(b4.type == OPEN)
++            self.assertTrue(b4.open.asn == 237)
++            self.assertTrue(b4.open.param_len == 16)
++            self.assertTrue(len(b4.open.parameters) == 3)
+             p = b4.open.parameters[0]
+-            self.failUnless(p.type == CAPABILITY)
+-            self.failUnless(p.len == 6)
++            self.assertTrue(p.type == CAPABILITY)
++            self.assertTrue(p.len == 6)
+             c = p.capability
+-            self.failUnless(c.code == CAP_MULTIPROTOCOL)
+-            self.failUnless(c.len == 4)
+-            self.failUnless(c.data == '\x00\x01\x00\x01')
++            self.assertTrue(c.code == CAP_MULTIPROTOCOL)
++            self.assertTrue(c.len == 4)
++            self.assertTrue(c.data == b'\x00\x01\x00\x01')
+             c = b4.open.parameters[2].capability
+-            self.failUnless(c.code == CAP_ROUTE_REFRESH)
+-            self.failUnless(c.len == 0)
++            self.assertTrue(c.code == CAP_ROUTE_REFRESH)
++            self.assertTrue(c.len == 0)
+ 
+-        bgp1 = '\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x13\x04'
+-        bgp2 = '\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x63\x02\x00\x00\x00\x48\x40\x01\x01\x00\x40\x02\x0a\x01\x02\x01\xf4\x01\xf4\x02\x01\xfe\xbb\x40\x03\x04\xc0\xa8\x00\x0f\x40\x05\x04\x00\x00\x00\x64\x40\x06\x00\xc0\x07\x06\xfe\xba\xc0\xa8\x00\x0a\xc0\x08\x0c\xfe\xbf\x00\x01\x03\x16\x00\x04\x01\x54\x00\xfa\x80\x09\x04\xc0\xa8\x00\x0f\x80\x0a\x04\xc0\xa8\x00\xfa\x16\xc0\xa8\x04'
+-        bgp3 = '\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x79\x02\x00\x00\x00\x62\x40\x01\x01\x00\x40\x02\x00\x40\x05\x04\x00\x00\x00\x64\xc0\x10\x08\x00\x02\x01\x2c\x00\x00\x01\x2c\xc0\x80\x24\x00\x00\xfd\xe9\x40\x01\x01\x00\x40\x02\x04\x02\x01\x15\xb3\x40\x05\x04\x00\x00\x00\x2c\x80\x09\x04\x16\x05\x05\x05\x80\x0a\x04\x16\x05\x05\x05\x90\x0e\x00\x1e\x00\x01\x80\x0c\x00\x00\x00\x00\x00\x00\x00\x00\x0c\x04\x04\x04\x00\x60\x18\x77\x01\x00\x00\x01\xf4\x00\x00\x01\xf4\x85'
+-        bgp4 = '\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x2d\x01\x04\x00\xed\x00\x5a\xc6\x6e\x83\x7d\x10\x02\x06\x01\x04\x00\x01\x00\x01\x02\x02\x80\x00\x02\x02\x02\x00'
++        bgp1 = b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x13\x04'
++        bgp2 = b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x63\x02\x00\x00\x00\x48\x40\x01\x01\x00\x40\x02\x0a\x01\x02\x01\xf4\x01\xf4\x02\x01\xfe\xbb\x40\x03\x04\xc0\xa8\x00\x0f\x40\x05\x04\x00\x00\x00\x64\x40\x06\x00\xc0\x07\x06\xfe\xba\xc0\xa8\x00\x0a\xc0\x08\x0c\xfe\xbf\x00\x01\x03\x16\x00\x04\x01\x54\x00\xfa\x80\x09\x04\xc0\xa8\x00\x0f\x80\x0a\x04\xc0\xa8\x00\xfa\x16\xc0\xa8\x04'
++        bgp3 = b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x79\x02\x00\x00\x00\x62\x40\x01\x01\x00\x40\x02\x00\x40\x05\x04\x00\x00\x00\x64\xc0\x10\x08\x00\x02\x01\x2c\x00\x00\x01\x2c\xc0\x80\x24\x00\x00\xfd\xe9\x40\x01\x01\x00\x40\x02\x04\x02\x01\x15\xb3\x40\x05\x04\x00\x00\x00\x2c\x80\x09\x04\x16\x05\x05\x05\x80\x0a\x04\x16\x05\x05\x05\x90\x0e\x00\x1e\x00\x01\x80\x0c\x00\x00\x00\x00\x00\x00\x00\x00\x0c\x04\x04\x04\x00\x60\x18\x77\x01\x00\x00\x01\xf4\x00\x00\x01\xf4\x85'
++        bgp4 = b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x2d\x01\x04\x00\xed\x00\x5a\xc6\x6e\x83\x7d\x10\x02\x06\x01\x04\x00\x01\x00\x01\x02\x02\x80\x00\x02\x02\x02\x00'
+ 
+     unittest.main()
+Index: dpkt/tftp.py
+===================================================================
+--- dpkt/tftp.py	(revision 82)
++++ dpkt/tftp.py	(working copy)
+@@ -3,7 +3,7 @@
+ """Trivial File Transfer Protocol."""
+ 
+ import struct
+-import dpkt
++from . import dpkt
+ 
+ # Opcodes
+ OP_RRQ     = 1    # read request
+@@ -31,25 +31,28 @@
+             l = self.data.split('\x00')
+             self.filename = l[0]
+             self.mode = l[1]
+-            self.data = ''
++            self.data = b''
+         elif self.opcode in (OP_DATA, OP_ACK):
+             self.block = struct.unpack('>H', self.data[:2])
+             self.data = self.data[2:]
+         elif self.opcode == OP_ERR:
+             self.errcode = struct.unpack('>H', self.data[:2])
+             self.errmsg = self.data[2:].split('\x00')[0]
+-            self.data = ''
++            self.data = b''
+ 
+     def __len__(self):
+-        return len(str(self))
++        return len(bytes(self))
+ 
+     def __str__(self):
++        return str(self.__bytes__())
++
++    def __bytes__(self):
+         if self.opcode in (OP_RRQ, OP_WRQ):
+-            s = '%s\x00%s\x00' % (self.filename, self.mode)
++            s = b'%s\x00%s\x00' % (self.filename, self.mode)
+         elif self.opcode in (OP_DATA, OP_ACK):
+             s = struct.pack('>H', self.block)
+         elif self.opcode == OP_ERR:
+             s = struct.pack('>H', self.errcode) + ('%s\x00' % self.errmsg)
+         else:
+-            s = ''
++            s = b''
+         return self.pack_hdr() + s + self.data
+Index: dpkt/gre.py
+===================================================================
+--- dpkt/gre.py	(revision 82)
++++ dpkt/gre.py	(working copy)
+@@ -3,7 +3,7 @@
+ """Generic Routing Encapsulation."""
+ 
+ import struct
+-import dpkt
++from . import dpkt
+ 
+ GRE_CP = 0x8000  # Checksum Present
+ GRE_RP = 0x4000  # Routing Present
+@@ -62,11 +62,11 @@
+         dpkt.Packet.unpack(self, buf)
+         fields, fmts = self.opt_fields_fmts()
+         if fields:
+-            fmt = ''.join(fmts)
++            fmt = b''.join(fmts)
+             fmtlen = struct.calcsize(fmt)
+             vals = struct.unpack(fmt, self.data[:fmtlen])
+             self.data = self.data[fmtlen:]
+-            self.__dict__.update(dict(zip(fields, vals)))
++            self.__dict__.update(dict(list(zip(fields, vals))))
+         if self.flags & GRE_RP:
+             l = []
+             while True:
+@@ -86,19 +86,22 @@
+                sum(map(len, self.sre)) + len(self.data)
+ 
+     # XXX - need to fix up repr to display optional fields...
++
++    def __str__(self):
++        return str(self.__bytes__())
+     
+-    def __str__(self):
++    def __bytes__(self):
+         fields, fmts = self.opt_fields_fmts()
+         if fields:
+             vals = []
+             for f in fields:
+                 vals.append(getattr(self, f))
+-            opt_s = struct.pack(''.join(fmts), *vals)
++            opt_s = struct.pack(b''.join(fmts), *vals)
+         else:
+-            opt_s = ''
+-        return self.pack_hdr() + opt_s + ''.join(map(str, self.sre)) + \
+-               str(self.data)
++            opt_s = b''
++        return self.pack_hdr() + opt_s + b''.join(map(bytes, self.sre)) + \
++               bytes(self.data)
+ 
+ # XXX - auto-load GRE dispatch table from Ethernet dispatch table
+-import ethernet
++from . import ethernet
+ GRE._protosw.update(ethernet.Ethernet._typesw)
+Index: dpkt/crc32c.py
+===================================================================
+--- dpkt/crc32c.py	(revision 82)
++++ dpkt/crc32c.py	(working copy)
+@@ -6,58 +6,58 @@
+ # http://tools.ietf.org/html/rfc3309
+ 
+ crc32c_table = (
+-    0x00000000L, 0xF26B8303L, 0xE13B70F7L, 0x1350F3F4L, 0xC79A971FL,
+-    0x35F1141CL, 0x26A1E7E8L, 0xD4CA64EBL, 0x8AD958CFL, 0x78B2DBCCL,
+-    0x6BE22838L, 0x9989AB3BL, 0x4D43CFD0L, 0xBF284CD3L, 0xAC78BF27L,
+-    0x5E133C24L, 0x105EC76FL, 0xE235446CL, 0xF165B798L, 0x030E349BL,
+-    0xD7C45070L, 0x25AFD373L, 0x36FF2087L, 0xC494A384L, 0x9A879FA0L,
+-    0x68EC1CA3L, 0x7BBCEF57L, 0x89D76C54L, 0x5D1D08BFL, 0xAF768BBCL,
+-    0xBC267848L, 0x4E4DFB4BL, 0x20BD8EDEL, 0xD2D60DDDL, 0xC186FE29L,
+-    0x33ED7D2AL, 0xE72719C1L, 0x154C9AC2L, 0x061C6936L, 0xF477EA35L,
+-    0xAA64D611L, 0x580F5512L, 0x4B5FA6E6L, 0xB93425E5L, 0x6DFE410EL,
+-    0x9F95C20DL, 0x8CC531F9L, 0x7EAEB2FAL, 0x30E349B1L, 0xC288CAB2L,
+-    0xD1D83946L, 0x23B3BA45L, 0xF779DEAEL, 0x05125DADL, 0x1642AE59L,
+-    0xE4292D5AL, 0xBA3A117EL, 0x4851927DL, 0x5B016189L, 0xA96AE28AL,
+-    0x7DA08661L, 0x8FCB0562L, 0x9C9BF696L, 0x6EF07595L, 0x417B1DBCL,
+-    0xB3109EBFL, 0xA0406D4BL, 0x522BEE48L, 0x86E18AA3L, 0x748A09A0L,
+-    0x67DAFA54L, 0x95B17957L, 0xCBA24573L, 0x39C9C670L, 0x2A993584L,
+-    0xD8F2B687L, 0x0C38D26CL, 0xFE53516FL, 0xED03A29BL, 0x1F682198L,
+-    0x5125DAD3L, 0xA34E59D0L, 0xB01EAA24L, 0x42752927L, 0x96BF4DCCL,
+-    0x64D4CECFL, 0x77843D3BL, 0x85EFBE38L, 0xDBFC821CL, 0x2997011FL,
+-    0x3AC7F2EBL, 0xC8AC71E8L, 0x1C661503L, 0xEE0D9600L, 0xFD5D65F4L,
+-    0x0F36E6F7L, 0x61C69362L, 0x93AD1061L, 0x80FDE395L, 0x72966096L,
+-    0xA65C047DL, 0x5437877EL, 0x4767748AL, 0xB50CF789L, 0xEB1FCBADL,
+-    0x197448AEL, 0x0A24BB5AL, 0xF84F3859L, 0x2C855CB2L, 0xDEEEDFB1L,
+-    0xCDBE2C45L, 0x3FD5AF46L, 0x7198540DL, 0x83F3D70EL, 0x90A324FAL,
+-    0x62C8A7F9L, 0xB602C312L, 0x44694011L, 0x5739B3E5L, 0xA55230E6L,
+-    0xFB410CC2L, 0x092A8FC1L, 0x1A7A7C35L, 0xE811FF36L, 0x3CDB9BDDL,
+-    0xCEB018DEL, 0xDDE0EB2AL, 0x2F8B6829L, 0x82F63B78L, 0x709DB87BL,
+-    0x63CD4B8FL, 0x91A6C88CL, 0x456CAC67L, 0xB7072F64L, 0xA457DC90L,
+-    0x563C5F93L, 0x082F63B7L, 0xFA44E0B4L, 0xE9141340L, 0x1B7F9043L,
+-    0xCFB5F4A8L, 0x3DDE77ABL, 0x2E8E845FL, 0xDCE5075CL, 0x92A8FC17L,
+-    0x60C37F14L, 0x73938CE0L, 0x81F80FE3L, 0x55326B08L, 0xA759E80BL,
+-    0xB4091BFFL, 0x466298FCL, 0x1871A4D8L, 0xEA1A27DBL, 0xF94AD42FL,
+-    0x0B21572CL, 0xDFEB33C7L, 0x2D80B0C4L, 0x3ED04330L, 0xCCBBC033L,
+-    0xA24BB5A6L, 0x502036A5L, 0x4370C551L, 0xB11B4652L, 0x65D122B9L,
+-    0x97BAA1BAL, 0x84EA524EL, 0x7681D14DL, 0x2892ED69L, 0xDAF96E6AL,
+-    0xC9A99D9EL, 0x3BC21E9DL, 0xEF087A76L, 0x1D63F975L, 0x0E330A81L,
+-    0xFC588982L, 0xB21572C9L, 0x407EF1CAL, 0x532E023EL, 0xA145813DL,
+-    0x758FE5D6L, 0x87E466D5L, 0x94B49521L, 0x66DF1622L, 0x38CC2A06L,
+-    0xCAA7A905L, 0xD9F75AF1L, 0x2B9CD9F2L, 0xFF56BD19L, 0x0D3D3E1AL,
+-    0x1E6DCDEEL, 0xEC064EEDL, 0xC38D26C4L, 0x31E6A5C7L, 0x22B65633L,
+-    0xD0DDD530L, 0x0417B1DBL, 0xF67C32D8L, 0xE52CC12CL, 0x1747422FL,
+-    0x49547E0BL, 0xBB3FFD08L, 0xA86F0EFCL, 0x5A048DFFL, 0x8ECEE914L,
+-    0x7CA56A17L, 0x6FF599E3L, 0x9D9E1AE0L, 0xD3D3E1ABL, 0x21B862A8L,
+-    0x32E8915CL, 0xC083125FL, 0x144976B4L, 0xE622F5B7L, 0xF5720643L,
+-    0x07198540L, 0x590AB964L, 0xAB613A67L, 0xB831C993L, 0x4A5A4A90L,
+-    0x9E902E7BL, 0x6CFBAD78L, 0x7FAB5E8CL, 0x8DC0DD8FL, 0xE330A81AL,
+-    0x115B2B19L, 0x020BD8EDL, 0xF0605BEEL, 0x24AA3F05L, 0xD6C1BC06L,
+-    0xC5914FF2L, 0x37FACCF1L, 0x69E9F0D5L, 0x9B8273D6L, 0x88D28022L,
+-    0x7AB90321L, 0xAE7367CAL, 0x5C18E4C9L, 0x4F48173DL, 0xBD23943EL,
+-    0xF36E6F75L, 0x0105EC76L, 0x12551F82L, 0xE03E9C81L, 0x34F4F86AL,
+-    0xC69F7B69L, 0xD5CF889DL, 0x27A40B9EL, 0x79B737BAL, 0x8BDCB4B9L,
+-    0x988C474DL, 0x6AE7C44EL, 0xBE2DA0A5L, 0x4C4623A6L, 0x5F16D052L,
+-    0xAD7D5351L
++    0x00000000, 0xF26B8303, 0xE13B70F7, 0x1350F3F4, 0xC79A971F,
++    0x35F1141C, 0x26A1E7E8, 0xD4CA64EB, 0x8AD958CF, 0x78B2DBCC,
++    0x6BE22838, 0x9989AB3B, 0x4D43CFD0, 0xBF284CD3, 0xAC78BF27,
++    0x5E133C24, 0x105EC76F, 0xE235446C, 0xF165B798, 0x030E349B,
++    0xD7C45070, 0x25AFD373, 0x36FF2087, 0xC494A384, 0x9A879FA0,
++    0x68EC1CA3, 0x7BBCEF57, 0x89D76C54, 0x5D1D08BF, 0xAF768BBC,
++    0xBC267848, 0x4E4DFB4B, 0x20BD8EDE, 0xD2D60DDD, 0xC186FE29,
++    0x33ED7D2A, 0xE72719C1, 0x154C9AC2, 0x061C6936, 0xF477EA35,
++    0xAA64D611, 0x580F5512, 0x4B5FA6E6, 0xB93425E5, 0x6DFE410E,
++    0x9F95C20D, 0x8CC531F9, 0x7EAEB2FA, 0x30E349B1, 0xC288CAB2,
++    0xD1D83946, 0x23B3BA45, 0xF779DEAE, 0x05125DAD, 0x1642AE59,
++    0xE4292D5A, 0xBA3A117E, 0x4851927D, 0x5B016189, 0xA96AE28A,
++    0x7DA08661, 0x8FCB0562, 0x9C9BF696, 0x6EF07595, 0x417B1DBC,
++    0xB3109EBF, 0xA0406D4B, 0x522BEE48, 0x86E18AA3, 0x748A09A0,
++    0x67DAFA54, 0x95B17957, 0xCBA24573, 0x39C9C670, 0x2A993584,
++    0xD8F2B687, 0x0C38D26C, 0xFE53516F, 0xED03A29B, 0x1F682198,
++    0x5125DAD3, 0xA34E59D0, 0xB01EAA24, 0x42752927, 0x96BF4DCC,
++    0x64D4CECF, 0x77843D3B, 0x85EFBE38, 0xDBFC821C, 0x2997011F,
++    0x3AC7F2EB, 0xC8AC71E8, 0x1C661503, 0xEE0D9600, 0xFD5D65F4,
++    0x0F36E6F7, 0x61C69362, 0x93AD1061, 0x80FDE395, 0x72966096,
++    0xA65C047D, 0x5437877E, 0x4767748A, 0xB50CF789, 0xEB1FCBAD,
++    0x197448AE, 0x0A24BB5A, 0xF84F3859, 0x2C855CB2, 0xDEEEDFB1,
++    0xCDBE2C45, 0x3FD5AF46, 0x7198540D, 0x83F3D70E, 0x90A324FA,
++    0x62C8A7F9, 0xB602C312, 0x44694011, 0x5739B3E5, 0xA55230E6,
++    0xFB410CC2, 0x092A8FC1, 0x1A7A7C35, 0xE811FF36, 0x3CDB9BDD,
++    0xCEB018DE, 0xDDE0EB2A, 0x2F8B6829, 0x82F63B78, 0x709DB87B,
++    0x63CD4B8F, 0x91A6C88C, 0x456CAC67, 0xB7072F64, 0xA457DC90,
++    0x563C5F93, 0x082F63B7, 0xFA44E0B4, 0xE9141340, 0x1B7F9043,
++    0xCFB5F4A8, 0x3DDE77AB, 0x2E8E845F, 0xDCE5075C, 0x92A8FC17,
++    0x60C37F14, 0x73938CE0, 0x81F80FE3, 0x55326B08, 0xA759E80B,
++    0xB4091BFF, 0x466298FC, 0x1871A4D8, 0xEA1A27DB, 0xF94AD42F,
++    0x0B21572C, 0xDFEB33C7, 0x2D80B0C4, 0x3ED04330, 0xCCBBC033,
++    0xA24BB5A6, 0x502036A5, 0x4370C551, 0xB11B4652, 0x65D122B9,
++    0x97BAA1BA, 0x84EA524E, 0x7681D14D, 0x2892ED69, 0xDAF96E6A,
++    0xC9A99D9E, 0x3BC21E9D, 0xEF087A76, 0x1D63F975, 0x0E330A81,
++    0xFC588982, 0xB21572C9, 0x407EF1CA, 0x532E023E, 0xA145813D,
++    0x758FE5D6, 0x87E466D5, 0x94B49521, 0x66DF1622, 0x38CC2A06,
++    0xCAA7A905, 0xD9F75AF1, 0x2B9CD9F2, 0xFF56BD19, 0x0D3D3E1A,
++    0x1E6DCDEE, 0xEC064EED, 0xC38D26C4, 0x31E6A5C7, 0x22B65633,
++    0xD0DDD530, 0x0417B1DB, 0xF67C32D8, 0xE52CC12C, 0x1747422F,
++    0x49547E0B, 0xBB3FFD08, 0xA86F0EFC, 0x5A048DFF, 0x8ECEE914,
++    0x7CA56A17, 0x6FF599E3, 0x9D9E1AE0, 0xD3D3E1AB, 0x21B862A8,
++    0x32E8915C, 0xC083125F, 0x144976B4, 0xE622F5B7, 0xF5720643,
++    0x07198540, 0x590AB964, 0xAB613A67, 0xB831C993, 0x4A5A4A90,
++    0x9E902E7B, 0x6CFBAD78, 0x7FAB5E8C, 0x8DC0DD8F, 0xE330A81A,
++    0x115B2B19, 0x020BD8ED, 0xF0605BEE, 0x24AA3F05, 0xD6C1BC06,
++    0xC5914FF2, 0x37FACCF1, 0x69E9F0D5, 0x9B8273D6, 0x88D28022,
++    0x7AB90321, 0xAE7367CA, 0x5C18E4C9, 0x4F48173D, 0xBD23943E,
++    0xF36E6F75, 0x0105EC76, 0x12551F82, 0xE03E9C81, 0x34F4F86A,
++    0xC69F7B69, 0xD5CF889D, 0x27A40B9E, 0x79B737BA, 0x8BDCB4B9,
++    0x988C474D, 0x6AE7C44E, 0xBE2DA0A5, 0x4C4623A6, 0x5F16D052,
++    0xAD7D5351
+     )
+ 
+ def add(crc, buf):
+@@ -67,7 +67,7 @@
+     return crc
+ 
+ def done(crc):
+-    tmp = ~crc & 0xffffffffL
++    tmp = ~crc & 0xffffffff
+     b0 = tmp & 0xff
+     b1 = (tmp >> 8) & 0xff
+     b2 = (tmp >> 16) & 0xff
+@@ -77,4 +77,4 @@
+ 
+ def cksum(buf):
+     """Return computed CRC-32c checksum."""
+-    return done(add(0xffffffffL, buf))
++    return done(add(0xffffffff, buf))
+Index: dpkt/pppoe.py
+===================================================================
+--- dpkt/pppoe.py	(revision 82)
++++ dpkt/pppoe.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """PPP-over-Ethernet."""
+ 
+-import dpkt, ppp
++from . import dpkt, ppp
+ 
+ # RFC 2516 codes
+ PPPoE_PADI	= 0x09
+Index: dpkt/pcap.py
+===================================================================
+--- dpkt/pcap.py	(revision 82)
++++ dpkt/pcap.py	(working copy)
+@@ -3,10 +3,10 @@
+ """Libpcap file format."""
+
+ import sys, time
+-import dpkt
++from . import dpkt
+ 
+-TCPDUMP_MAGIC = 0xa1b2c3d4L
+-PMUDPCT_MAGIC = 0xd4c3b2a1L
++TCPDUMP_MAGIC = 0xa1b2c3d4
++PMUDPCT_MAGIC = 0xd4c3b2a1
+ 
+ PCAP_VERSION_MAJOR = 2
+ PCAP_VERSION_MINOR = 4
+@@ -73,8 +73,8 @@
+         fh = FileHdr(snaplen=snaplen, linktype=linktype)
+-        self.__f.write(str(fh))
++        self.__f.write(bytes(fh))
+
+     def writepkt(self, pkt, ts=None):
+         if ts is None:
+             ts = time.time()
+-        s = str(pkt)
++        s = bytes(pkt)
+         n = len(s)
+@@ -81,7 +81,7 @@
+         ph = PktHdr(tv_sec=int(ts),
+                     tv_usec=int((float(ts) - int(ts)) * 1000000.0),
+                     caplen=n, len=n)
+-        self.__f.write(str(ph))
++        self.__f.write(bytes(ph))
+         self.__f.write(s)
+ 
+     def close(self):
+@@ -101,13 +101,13 @@
+             self.__fh = LEFileHdr(buf)
+             self.__ph = LEPktHdr
+         elif self.__fh.magic != TCPDUMP_MAGIC:
+-            raise ValueError, 'invalid tcpdump header'
++            raise ValueError('invalid tcpdump header')
+         if self.__fh.linktype in dltoff:
+             self.dloff = dltoff[self.__fh.linktype]
+         else:
+             self.dloff = 0
+         self.snaplen = self.__fh.snaplen
+-        self.filter = ''
++        self.filter = b''
+ 
+     def fileno(self):
+         return self.fd
+@@ -124,7 +124,7 @@
+     def dispatch(self, cnt, callback, *args):
+         if cnt > 0:
+             for i in range(cnt):
+-                ts, pkt = self.next()
++                ts, pkt = next(self)
+                 callback(ts, pkt, *args)
+         else:
+             for ts, pkt in self:
+@@ -151,6 +151,6 @@
+             le = '\xd4\xc3\xb2\xa1\x02\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x60\x00\x00\x00\x01\x00\x00\x00'
+             befh = FileHdr(be)
+             lefh = LEFileHdr(le)
+-            self.failUnless(befh.linktype == lefh.linktype)
++            self.assertTrue(befh.linktype == lefh.linktype)
+ 
+     unittest.main()
+Index: dpkt/vrrp.py
+===================================================================
+--- dpkt/vrrp.py	(revision 82)
++++ dpkt/vrrp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Virtual Router Redundancy Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ class VRRP(dpkt.Packet):
+     __hdr__ = (
+@@ -15,7 +15,7 @@
+         ('sum', 'H', 0),
+         )
+     addrs = ()
+-    auth = ''
++    auth = b''
+     def _get_v(self):
+         return self.vtype >> 4
+     def _set_v(self, v):
+@@ -35,13 +35,16 @@
+             l.append(self.data[off:off+4])
+         self.addrs = l
+         self.auth = self.data[off+4:]
+-        self.data = ''
++        self.data = b''
+ 
+     def __len__(self):
+         return self.__hdr_len__ + (4 * self.count) + len(self.auth)
+ 
+     def __str__(self):
+-        data = ''.join(self.addrs) + self.auth
++        return str(self.__bytes__())
++
++    def __bytes__(self):
++        data = b''.join(self.addrs) + self.auth
+         if not self.sum:
+             self.sum = dpkt.in_cksum(self.pack_hdr() + data)
+         return self.pack_hdr() + data
+Index: dpkt/rip.py
+===================================================================
+--- dpkt/rip.py	(revision 82)
++++ dpkt/rip.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Routing Information Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ # RIP v2 - RFC 2453
+ # http://tools.ietf.org/html/rfc2453
+@@ -38,12 +38,15 @@
+         return len
+ 
+     def __str__(self):
+-        auth = ''
++        return str(self.__bytes__())
++
++    def __bytes__(self):
++        auth = b''
+         if self.auth:
+-            auth = str(self.auth)
++            auth = bytes(self.auth)
+         return self.pack_hdr() + \
+                auth + \
+-               ''.join(map(str, self.rtes))
++               b''.join(map(bytes, self.rtes))
+ 
+ class RTE(dpkt.Packet):
+     __hdr__ = (
+@@ -68,17 +71,17 @@
+     class RIPTestCase(unittest.TestCase):
+         def testPack(self):
+             r = RIP(self.s)
+-            self.failUnless(self.s == str(r))
++            self.assertTrue(self.s == bytes(r))
+ 
+         def testUnpack(self):
+             r = RIP(self.s)
+-            self.failUnless(r.auth == None)
+-            self.failUnless(len(r.rtes) == 2)
++            self.assertTrue(r.auth == None)
++            self.assertTrue(len(r.rtes) == 2)
+ 
+             rte = r.rtes[1]
+-            self.failUnless(rte.family == 2)
+-            self.failUnless(rte.route_tag == 0)
+-            self.failUnless(rte.metric == 1)
++            self.assertTrue(rte.family == 2)
++            self.assertTrue(rte.route_tag == 0)
++            self.assertTrue(rte.metric == 1)
+ 
+-        s = '\x02\x02\x00\x00\x00\x02\x00\x00\x01\x02\x03\x00\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x02\x00\x00\xc0\xa8\x01\x08\xff\xff\xff\xfc\x00\x00\x00\x00\x00\x00\x00\x01'
++        s = b'\x02\x02\x00\x00\x00\x02\x00\x00\x01\x02\x03\x00\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x02\x00\x00\xc0\xa8\x01\x08\xff\xff\xff\xfc\x00\x00\x00\x00\x00\x00\x00\x01'
+     unittest.main()
+Index: dpkt/ntp.py
+===================================================================
+--- dpkt/ntp.py	(revision 82)
++++ dpkt/ntp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Network Time Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ # NTP v4
+ 
+@@ -61,23 +61,23 @@
+     class NTPTestCase(unittest.TestCase):
+         def testPack(self):
+             n = NTP(self.s)
+-            self.failUnless(self.s == str(n))
++            self.assertTrue(self.s == bytes(n))
+ 
+         def testUnpack(self):
+             n = NTP(self.s)
+-            self.failUnless(n.li == NO_WARNING)
+-            self.failUnless(n.v == 4)
+-            self.failUnless(n.mode == SERVER)
+-            self.failUnless(n.stratum == 2)
+-            self.failUnless(n.id == '\xc1\x02\x04\x02')
++            self.assertTrue(n.li == NO_WARNING)
++            self.assertTrue(n.v == 4)
++            self.assertTrue(n.mode == SERVER)
++            self.assertTrue(n.stratum == 2)
++            self.assertTrue(n.id == b'\xc1\x02\x04\x02')
+ 
+             # test get/set functions
+             n.li = ALARM_CONDITION
+             n.v = 3
+             n.mode = CLIENT
+-            self.failUnless(n.li == ALARM_CONDITION)
+-            self.failUnless(n.v == 3)
+-            self.failUnless(n.mode == CLIENT)
++            self.assertTrue(n.li == ALARM_CONDITION)
++            self.assertTrue(n.v == 3)
++            self.assertTrue(n.mode == CLIENT)
+ 
+-        s = '\x24\x02\x04\xef\x00\x00\x00\x84\x00\x00\x33\x27\xc1\x02\x04\x02\xc8\x90\xec\x11\x22\xae\x07\xe5\xc8\x90\xf9\xd9\xc0\x7e\x8c\xcd\xc8\x90\xf9\xd9\xda\xc5\xb0\x78\xc8\x90\xf9\xd9\xda\xc6\x8a\x93'
++        s = b'\x24\x02\x04\xef\x00\x00\x00\x84\x00\x00\x33\x27\xc1\x02\x04\x02\xc8\x90\xec\x11\x22\xae\x07\xe5\xc8\x90\xf9\xd9\xc0\x7e\x8c\xcd\xc8\x90\xf9\xd9\xda\xc5\xb0\x78\xc8\x90\xf9\xd9\xda\xc6\x8a\x93'
+     unittest.main()
+Index: dpkt/radiotap.py
+===================================================================
+--- dpkt/radiotap.py	(revision 82)
++++ dpkt/radiotap.py	(working copy)
+@@ -1,6 +1,6 @@
+ '''Radiotap'''
+ 
+-import dpkt
++from . import dpkt
+ 
+ # Ref: http://www.radiotap.org
+ # Fields Ref: http://www.radiotap.org/defined-fields/all
+@@ -157,7 +157,7 @@
+         for name, present_bit, parser in field_decoder:
+             if present_bit:
+                 field = parser(buf)
+-                field.data = ''
++                field.data = b''
+                 setattr(self, name, field)
+                 self.fields.append(field)
+                 buf = buf[len(field):]
+@@ -244,25 +244,25 @@
+ 
+     class RadiotapTestCase(unittest.TestCase):
+         def test_Radiotap(self):
+-            s = '\x00\x00\x00\x18\x6e\x48\x00\x00\x00\x02\x6c\x09\xa0\x00\xa8\x81\x02\x00\x00\x00\x00\x00\x00\x00'
++            s = b'\x00\x00\x00\x18\x6e\x48\x00\x00\x00\x02\x6c\x09\xa0\x00\xa8\x81\x02\x00\x00\x00\x00\x00\x00\x00'
+             rad = Radiotap(s)
+-            self.failUnless(rad.version == 0)
+-            self.failUnless(rad.present_flags == 0x6e480000)
+-            self.failUnless(rad.tsft_present == 0)
+-            self.failUnless(rad.flags_present == 1)
+-            self.failUnless(rad.rate_present == 1)
+-            self.failUnless(rad.channel_present == 1)
+-            self.failUnless(rad.fhss_present == 0)
+-            self.failUnless(rad.ant_sig_present == 1)
+-            self.failUnless(rad.ant_noise_present == 1)
+-            self.failUnless(rad.lock_qual_present == 0)
+-            self.failUnless(rad.db_tx_attn_present == 0)
+-            self.failUnless(rad.dbm_tx_power_present == 0)
+-            self.failUnless(rad.ant_present == 1)
+-            self.failUnless(rad.db_ant_sig_present == 0)
+-            self.failUnless(rad.db_ant_noise_present == 0)
+-            self.failUnless(rad.rx_flags_present == 1)
+-            self.failUnless(rad.channel.freq == 0x6c09)
+-            self.failUnless(rad.channel.flags == 0xa000)
+-            self.failUnless(len(rad.fields) == 7)
++            self.assertTrue(rad.version == 0)
++            self.assertTrue(rad.present_flags == 0x6e480000)
++            self.assertTrue(rad.tsft_present == 0)
++            self.assertTrue(rad.flags_present == 1)
++            self.assertTrue(rad.rate_present == 1)
++            self.assertTrue(rad.channel_present == 1)
++            self.assertTrue(rad.fhss_present == 0)
++            self.assertTrue(rad.ant_sig_present == 1)
++            self.assertTrue(rad.ant_noise_present == 1)
++            self.assertTrue(rad.lock_qual_present == 0)
++            self.assertTrue(rad.db_tx_attn_present == 0)
++            self.assertTrue(rad.dbm_tx_power_present == 0)
++            self.assertTrue(rad.ant_present == 1)
++            self.assertTrue(rad.db_ant_sig_present == 0)
++            self.assertTrue(rad.db_ant_noise_present == 0)
++            self.assertTrue(rad.rx_flags_present == 1)
++            self.assertTrue(rad.channel.freq == 0x6c09)
++            self.assertTrue(rad.channel.flags == 0xa000)
++            self.assertTrue(len(rad.fields) == 7)
+     unittest.main()
+Index: dpkt/rtp.py
+===================================================================
+--- dpkt/rtp.py	(revision 82)
++++ dpkt/rtp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Real-Time Transport Protocol"""
+ 
+-from dpkt import Packet
++from .dpkt import Packet
+ 
+ # version 1100 0000 0000 0000 ! 0xC000  14
+ # p       0010 0000 0000 0000 ! 0x2000  13
+@@ -34,7 +34,7 @@
+         ('ts',      'I',    0),
+         ('ssrc',    'I',    0),
+     )
+-    csrc = ''
++    csrc = b''
+ 
+     def _get_version(self): return (self._type&_VERSION_MASK)>>_VERSION_SHIFT
+     def _set_version(self, ver):
+@@ -61,8 +61,11 @@
+         return self.__hdr_len__ + len(self.csrc) + len(self.data)
+ 
+     def __str__(self):
+-        return self.pack_hdr() + self.csrc + str(self.data)
++        return str(self.__bytes__())
+ 
++    def __bytes__(self):
++        return self.pack_hdr() + self.csrc + bytes(self.data)
++
+     def unpack(self, buf):
+         super(RTP, self).unpack(buf)
+         self.csrc = buf[self.__hdr_len__:self.__hdr_len__ + self.cc * 4]
+Index: dpkt/cdp.py
+===================================================================
+--- dpkt/cdp.py	(revision 82)
++++ dpkt/cdp.py	(working copy)
+@@ -2,8 +2,8 @@
+ 
+ """Cisco Discovery Protocol."""
+ 
+-import struct
+-import dpkt
++import struct
++from . import dpkt
+ 
+ CDP_DEVID		= 1	# string
+ CDP_ADDRESS		= 2
+@@ -65,12 +65,15 @@
+             else:
+                 n = len(self.data)
+             return self.__hdr_len__ + n
++
++        def __str__(self):
++            return str(self.__bytes__())
+         
+-        def __str__(self):
++        def __bytes__(self):
+             self.len = len(self)
+             if self.type == CDP_ADDRESS:
+                 s = struct.pack('>I', len(self.data)) + \
+-                    ''.join(map(str, self.data))
++                    b''.join(map(bytes, self.data))
+             else:
+                 s = self.data
+             return self.pack_hdr() + s
+@@ -89,7 +92,10 @@
+         return self.__hdr_len__ + sum(map(len, self.data))
+ 
+     def __str__(self):
+-        data = ''.join(map(str, self.data))
++        return str(self.__bytes__())
++
++    def __bytes__(self):
++        data = b''.join(map(bytes, self.data))
+         if not self.sum:
+             self.sum = dpkt.in_cksum(self.pack_hdr() + data)
+         return self.pack_hdr() + data
+Index: dpkt/ospf.py
+===================================================================
+--- dpkt/ospf.py	(revision 82)
++++ dpkt/ospf.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Open Shortest Path First."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ AUTH_NONE = 0
+ AUTH_PASSWORD = 1
+@@ -19,7 +19,11 @@
+         ('atype', 'H', 0),
+         ('auth', '8s', '')
+         )
++
+     def __str__(self):
++        return str(self.__bytes__())
++
++    def __bytes__(self):
+         if not self.sum:
+-            self.sum = dpkt.in_cksum(dpkt.Packet.__str__(self))
+-        return dpkt.Packet.__str__(self)
++            self.sum = dpkt.in_cksum(dpkt.Packet.__bytes__(self))
++        return dpkt.Packet.__bytes__(self)
+Index: dpkt/hsrp.py
+===================================================================
+--- dpkt/hsrp.py	(revision 82)
++++ dpkt/hsrp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Cisco Hot Standby Router Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ # Opcodes
+ HELLO = 0
+Index: dpkt/dhcp.py
+===================================================================
+--- dpkt/dhcp.py	(revision 82)
++++ dpkt/dhcp.py	(working copy)
+@@ -2,7 +2,8 @@
+ 
+ """Dynamic Host Configuration Protocol."""
+ 
+-import arp, dpkt
++from . import arp, dpkt, compat
++import struct
+ 
+ DHCP_OP_REQUEST = 1
+ DHCP_OP_REPLY = 2
+@@ -99,7 +100,7 @@
+         ('hrd', 'B', arp.ARP_HRD_ETH),  # just like ARP.hrd
+         ('hln', 'B', 6),		# and ARP.hln
+         ('hops', 'B', 0),
+-        ('xid', 'I', 0xdeadbeefL),
++        ('xid', 'I', 0xdeadbeef),
+         ('secs', 'H', 0),
+         ('flags', 'H', 0),
+         ('ciaddr', 'I', 0),
+@@ -122,19 +123,22 @@
+     def __len__(self):
+         return self.__hdr_len__ + \
+                sum([ 2 + len(o[1]) for o in self.opts ]) + 1 + len(self.data)
+-    
++
+     def __str__(self):
+-        return self.pack_hdr() + self.pack_opts() + str(self.data)
++        return str(self.__bytes__())
+     
++    def __bytes__(self):
++        return self.pack_hdr() + self.pack_opts() + bytes(self.data)
++    
+     def pack_opts(self):
+         """Return packed options string."""
+         if not self.opts:
+-            return ''
++            return b''
+         l = []
+         for t, data in self.opts:
+-            l.append('%s%s%s' % (chr(t), chr(len(data)), data))
+-        l.append('\xff')
+-        return ''.join(l)
++            l.append(struct.pack("BB%is"%len(data), t, len(data), data))
++        l.append(b'\xff')
++        return b''.join(l)
+     
+     def unpack(self, buf):
+         dpkt.Packet.unpack(self, buf)
+@@ -142,14 +146,14 @@
+         buf = self.data
+         l = []
+         while buf:
+-            t = ord(buf[0])
++            t = compat.compat_ord(buf[0])
+             if t == 0xff:
+                 buf = buf[1:]
+                 break
+             elif t == 0:
+                 buf = buf[1:]
+             else:
+-                n = ord(buf[1])
++                n = compat.compat_ord(buf[1])
+                 l.append((t, buf[2:2+n]))
+                 buf = buf[2+n:]
+         self.opts = l
+@@ -160,9 +164,9 @@
+ 
+     class DHCPTestCast(unittest.TestCase):
+         def test_DHCP(self):
+-            s = '\x01\x01\x06\x00\xadS\xc8c\xb8\x87\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02U\x82\xf3\xa6\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00c\x82Sc5\x01\x01\xfb\x01\x01=\x07\x01\x00\x02U\x82\xf3\xa62\x04\n\x00\x01e\x0c\tGuinevere<\x08MSFT 5.07\n\x01\x0f\x03\x06,./\x1f!+\xff\x00\x00\x00\x00\x00'
++            s = b'\x01\x01\x06\x00\xadS\xc8c\xb8\x87\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02U\x82\xf3\xa6\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00c\x82Sc5\x01\x01\xfb\x01\x01=\x07\x01\x00\x02U\x82\xf3\xa62\x04\n\x00\x01e\x0c\tGuinevere<\x08MSFT 5.07\n\x01\x0f\x03\x06,./\x1f!+\xff\x00\x00\x00\x00\x00'
+             dhcp = DHCP(s)
+-            self.failUnless(s == str(dhcp))
++            self.assertTrue(s == bytes(dhcp))
+ 
+     unittest.main()
+ 
+Index: dpkt/h225.py
+===================================================================
+--- dpkt/h225.py	(revision 82)
++++ dpkt/h225.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """ITU-T H.225.0 Call Signaling."""
+ 
+-import dpkt, tpkt
++from . import dpkt, tpkt
+ import struct
+ 
+ # H225 Call Signaling
+@@ -129,11 +129,14 @@
+                sum(map(len, self.data))
+ 
+     def __str__(self):
++        return str(self.__bytes__())
++
++    def __bytes__(self):
+         return self.tpkt.pack_hdr() + \
+                self.pack_hdr() + \
+                self.ref_val + \
+                struct.pack('B', self.type) + \
+-               ''.join(map(str, self.data))
++               b''.join(map(bytes, self.data))
+ 
+     class IE(dpkt.Packet):
+         __hdr__ = (
+@@ -173,6 +176,9 @@
+                    + n
+ 
+         def __str__(self):
++            return str(self.__bytes__())
++
++        def __bytes__(self):
+             if self.type & 0x80:
+                 length_str = None
+             else:
+@@ -191,27 +197,27 @@
+     class H225TestCase(unittest.TestCase):
+         def testPack(self):
+             h = H225(self.s)
+-            self.failUnless(self.s == str(h))
++            self.assertTrue(self.s == bytes(h))
+ 
+         def testUnpack(self):
+             h = H225(self.s)
+-            self.failUnless(h.tpkt.v == 3)
+-            self.failUnless(h.tpkt.rsvd == 0)
+-            self.failUnless(h.tpkt.len == 1041)
+-            self.failUnless(h.proto == 8)
+-            self.failUnless(h.type == SETUP)
+-            self.failUnless(len(h.data) == 3)
++            self.assertTrue(h.tpkt.v == 3)
++            self.assertTrue(h.tpkt.rsvd == 0)
++            self.assertTrue(h.tpkt.len == 1041)
++            self.assertTrue(h.proto == 8)
++            self.assertTrue(h.type == SETUP)
++            self.assertTrue(len(h.data) == 3)
+ 
+             ie = h.data[0]
+-            self.failUnless(ie.type == BEARER_CAPABILITY)
+-            self.failUnless(ie.len == 3)
++            self.assertTrue(ie.type == BEARER_CAPABILITY)
++            self.assertTrue(ie.len == 3)
+             ie = h.data[1]
+-            self.failUnless(ie.type == DISPLAY)
+-            self.failUnless(ie.len == 14)
++            self.assertTrue(ie.type == DISPLAY)
++            self.assertTrue(ie.len == 14)
+             ie = h.data[2]
+-            self.failUnless(ie.type == USER_TO_USER)
+-            self.failUnless(ie.len == 1008)
++            self.assertTrue(ie.type == USER_TO_USER)
++            self.assertTrue(ie.len == 1008)
+ 
+-        s = '\x03\x00\x04\x11\x08\x02\x54\x2b\x05\x04\x03\x88\x93\xa5\x28\x0e\x4a\x6f\x6e\x20\x4f\x62\x65\x72\x68\x65\x69\x64\x65\x00\x7e\x03\xf0\x05\x20\xb8\x06\x00\x08\x91\x4a\x00\x04\x01\x40\x0c\x00\x4a\x00\x6f\x00\x6e\x00\x20\x00\x4f\x00\x62\x00\x65\x00\x72\x00\x68\x00\x65\x00\x69\x00\x64\x00\x65\x22\xc0\x09\x00\x00\x3d\x06\x65\x6b\x69\x67\x61\x00\x00\x14\x32\x2e\x30\x2e\x32\x20\x28\x4f\x50\x41\x4c\x20\x76\x32\x2e\x32\x2e\x32\x29\x00\x00\x00\x01\x40\x15\x00\x74\x00\x63\x00\x70\x00\x24\x00\x68\x00\x33\x00\x32\x00\x33\x00\x2e\x00\x76\x00\x6f\x00\x78\x00\x67\x00\x72\x00\x61\x00\x74\x00\x69\x00\x61\x00\x2e\x00\x6f\x00\x72\x00\x67\x00\x42\x87\x23\x2c\x06\xb8\x00\x6a\x8b\x1d\x0c\xb7\x06\xdb\x11\x9e\xca\x00\x10\xa4\x89\x6d\x6a\x00\xc5\x1d\x80\x04\x07\x00\x0a\x00\x01\x7a\x75\x30\x11\x00\x5e\x88\x1d\x0c\xb7\x06\xdb\x11\x9e\xca\x00\x10\xa4\x89\x6d\x6a\x82\x2b\x0e\x30\x40\x00\x00\x06\x04\x01\x00\x4c\x10\x09\x00\x00\x3d\x0f\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x57\x69\x64\x65\x36\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x26\x00\x00\x64\x0c\x10\x09\x00\x00\x3d\x0f\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x57\x69\x64\x65\x36\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x2a\x40\x00\x00\x06\x04\x01\x00\x4c\x10\x09\x00\x00\x3d\x09\x69\x4c\x42\x43\x2d\x31\x33\x6b\x33\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x20\x00\x00\x65\x0c\x10\x09\x00\x00\x3d\x09\x69\x4c\x42\x43\x2d\x31\x33\x6b\x33\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x20\x40\x00\x00\x06\x04\x01\x00\x4e\x0c\x03\x00\x83\x00\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x16\x00\x00\x66\x0e\x0c\x03\x00\x83\x00\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x4b\x40\x00\x00\x06\x04\x01\x00\x4c\x10\xb5\x00\x53\x4c\x2a\x02\x00\x00\x00\x00\x00\x40\x01\x00\x00\x40\x01\x02\x00\x08\x00\x00\x00\x00\x00\x31\x00\x01\x00\x40\x1f\x00\x00\x59\x06\x00\x00\x41\x00\x00\x00\x02\x00\x40\x01\x00\x00\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x41\x00\x00\x67\x0c\x10\xb5\x00\x53\x4c\x2a\x02\x00\x00\x00\x00\x00\x40\x01\x00\x00\x40\x01\x02\x00\x08\x00\x00\x00\x00\x00\x31\x00\x01\x00\x40\x1f\x00\x00\x59\x06\x00\x00\x41\x00\x00\x00\x02\x00\x40\x01\x00\x00\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x32\x40\x00\x00\x06\x04\x01\x00\x4c\x10\x09\x00\x00\x3d\x11\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x4e\x61\x72\x72\x6f\x77\x33\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x28\x00\x00\x68\x0c\x10\x09\x00\x00\x3d\x11\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x4e\x61\x72\x72\x6f\x77\x33\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x1d\x40\x00\x00\x06\x04\x01\x00\x4c\x60\x1d\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x13\x00\x00\x69\x0c\x60\x1d\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x1d\x40\x00\x00\x06\x04\x01\x00\x4c\x20\x1d\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x13\x00\x00\x6a\x0c\x20\x1d\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x01\x00\x01\x00\x01\x00\x01\x00\x81\x03\x02\x80\xf8\x02\x70\x01\x06\x00\x08\x81\x75\x00\x0b\x80\x13\x80\x01\xf4\x00\x01\x00\x00\x01\x00\x00\x01\x00\x00\x0c\xc0\x01\x00\x01\x80\x0b\x80\x00\x00\x20\x20\x09\x00\x00\x3d\x0f\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x57\x69\x64\x65\x36\x80\x00\x01\x20\x20\x09\x00\x00\x3d\x09\x69\x4c\x42\x43\x2d\x31\x33\x6b\x33\x80\x00\x02\x24\x18\x03\x00\xe6\x00\x80\x00\x03\x20\x20\xb5\x00\x53\x4c\x2a\x02\x00\x00\x00\x00\x00\x40\x01\x00\x00\x40\x01\x02\x00\x08\x00\x00\x00\x00\x00\x31\x00\x01\x00\x40\x1f\x00\x00\x59\x06\x00\x00\x41\x00\x00\x00\x02\x00\x40\x01\x00\x00\x80\x00\x04\x20\x20\x09\x00\x00\x3d\x11\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x4e\x61\x72\x72\x6f\x77\x33\x80\x00\x05\x20\xc0\xef\x80\x00\x06\x20\x40\xef\x80\x00\x07\x08\xe0\x03\x51\x00\x80\x01\x00\x80\x00\x08\x08\xd0\x03\x51\x00\x80\x01\x00\x80\x00\x09\x83\x01\x50\x80\x00\x0a\x83\x01\x10\x80\x00\x0b\x83\x01\x40\x00\x80\x01\x03\x06\x00\x00\x00\x01\x00\x02\x00\x03\x00\x04\x00\x05\x00\x06\x01\x00\x07\x00\x08\x00\x00\x09\x01\x00\x0a\x00\x0b\x07\x01\x00\x32\x80\xa6\xff\x4c\x02\x80\x01\x80'
++        s = b'\x03\x00\x04\x11\x08\x02\x54\x2b\x05\x04\x03\x88\x93\xa5\x28\x0e\x4a\x6f\x6e\x20\x4f\x62\x65\x72\x68\x65\x69\x64\x65\x00\x7e\x03\xf0\x05\x20\xb8\x06\x00\x08\x91\x4a\x00\x04\x01\x40\x0c\x00\x4a\x00\x6f\x00\x6e\x00\x20\x00\x4f\x00\x62\x00\x65\x00\x72\x00\x68\x00\x65\x00\x69\x00\x64\x00\x65\x22\xc0\x09\x00\x00\x3d\x06\x65\x6b\x69\x67\x61\x00\x00\x14\x32\x2e\x30\x2e\x32\x20\x28\x4f\x50\x41\x4c\x20\x76\x32\x2e\x32\x2e\x32\x29\x00\x00\x00\x01\x40\x15\x00\x74\x00\x63\x00\x70\x00\x24\x00\x68\x00\x33\x00\x32\x00\x33\x00\x2e\x00\x76\x00\x6f\x00\x78\x00\x67\x00\x72\x00\x61\x00\x74\x00\x69\x00\x61\x00\x2e\x00\x6f\x00\x72\x00\x67\x00\x42\x87\x23\x2c\x06\xb8\x00\x6a\x8b\x1d\x0c\xb7\x06\xdb\x11\x9e\xca\x00\x10\xa4\x89\x6d\x6a\x00\xc5\x1d\x80\x04\x07\x00\x0a\x00\x01\x7a\x75\x30\x11\x00\x5e\x88\x1d\x0c\xb7\x06\xdb\x11\x9e\xca\x00\x10\xa4\x89\x6d\x6a\x82\x2b\x0e\x30\x40\x00\x00\x06\x04\x01\x00\x4c\x10\x09\x00\x00\x3d\x0f\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x57\x69\x64\x65\x36\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x26\x00\x00\x64\x0c\x10\x09\x00\x00\x3d\x0f\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x57\x69\x64\x65\x36\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x2a\x40\x00\x00\x06\x04\x01\x00\x4c\x10\x09\x00\x00\x3d\x09\x69\x4c\x42\x43\x2d\x31\x33\x6b\x33\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x20\x00\x00\x65\x0c\x10\x09\x00\x00\x3d\x09\x69\x4c\x42\x43\x2d\x31\x33\x6b\x33\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x20\x40\x00\x00\x06\x04\x01\x00\x4e\x0c\x03\x00\x83\x00\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x16\x00\x00\x66\x0e\x0c\x03\x00\x83\x00\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x4b\x40\x00\x00\x06\x04\x01\x00\x4c\x10\xb5\x00\x53\x4c\x2a\x02\x00\x00\x00\x00\x00\x40\x01\x00\x00\x40\x01\x02\x00\x08\x00\x00\x00\x00\x00\x31\x00\x01\x00\x40\x1f\x00\x00\x59\x06\x00\x00\x41\x00\x00\x00\x02\x00\x40\x01\x00\x00\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x41\x00\x00\x67\x0c\x10\xb5\x00\x53\x4c\x2a\x02\x00\x00\x00\x00\x00\x40\x01\x00\x00\x40\x01\x02\x00\x08\x00\x00\x00\x00\x00\x31\x00\x01\x00\x40\x1f\x00\x00\x59\x06\x00\x00\x41\x00\x00\x00\x02\x00\x40\x01\x00\x00\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x32\x40\x00\x00\x06\x04\x01\x00\x4c\x10\x09\x00\x00\x3d\x11\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x4e\x61\x72\x72\x6f\x77\x33\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x28\x00\x00\x68\x0c\x10\x09\x00\x00\x3d\x11\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x4e\x61\x72\x72\x6f\x77\x33\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x1d\x40\x00\x00\x06\x04\x01\x00\x4c\x60\x1d\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x13\x00\x00\x69\x0c\x60\x1d\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x1d\x40\x00\x00\x06\x04\x01\x00\x4c\x20\x1d\x80\x11\x1c\x00\x01\x00\x98\xa0\x26\x41\x13\x8a\x00\x98\xa0\x26\x41\x13\x8b\x13\x00\x00\x6a\x0c\x20\x1d\x80\x0b\x0d\x00\x01\x00\x98\xa0\x26\x41\x13\x8b\x00\x01\x00\x01\x00\x01\x00\x01\x00\x81\x03\x02\x80\xf8\x02\x70\x01\x06\x00\x08\x81\x75\x00\x0b\x80\x13\x80\x01\xf4\x00\x01\x00\x00\x01\x00\x00\x01\x00\x00\x0c\xc0\x01\x00\x01\x80\x0b\x80\x00\x00\x20\x20\x09\x00\x00\x3d\x0f\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x57\x69\x64\x65\x36\x80\x00\x01\x20\x20\x09\x00\x00\x3d\x09\x69\x4c\x42\x43\x2d\x31\x33\x6b\x33\x80\x00\x02\x24\x18\x03\x00\xe6\x00\x80\x00\x03\x20\x20\xb5\x00\x53\x4c\x2a\x02\x00\x00\x00\x00\x00\x40\x01\x00\x00\x40\x01\x02\x00\x08\x00\x00\x00\x00\x00\x31\x00\x01\x00\x40\x1f\x00\x00\x59\x06\x00\x00\x41\x00\x00\x00\x02\x00\x40\x01\x00\x00\x80\x00\x04\x20\x20\x09\x00\x00\x3d\x11\x53\x70\x65\x65\x78\x20\x62\x73\x34\x20\x4e\x61\x72\x72\x6f\x77\x33\x80\x00\x05\x20\xc0\xef\x80\x00\x06\x20\x40\xef\x80\x00\x07\x08\xe0\x03\x51\x00\x80\x01\x00\x80\x00\x08\x08\xd0\x03\x51\x00\x80\x01\x00\x80\x00\x09\x83\x01\x50\x80\x00\x0a\x83\x01\x10\x80\x00\x0b\x83\x01\x40\x00\x80\x01\x03\x06\x00\x00\x00\x01\x00\x02\x00\x03\x00\x04\x00\x05\x00\x06\x01\x00\x07\x00\x08\x00\x00\x09\x01\x00\x0a\x00\x0b\x07\x01\x00\x32\x80\xa6\xff\x4c\x02\x80\x01\x80'
+ 
+     unittest.main()
+Index: dpkt/rpc.py
+===================================================================
+--- dpkt/rpc.py	(revision 82)
++++ dpkt/rpc.py	(working copy)
+@@ -3,7 +3,7 @@
+ """Remote Procedure Call."""
+ 
+ import struct
+-import dpkt
++from . import dpkt
+ 
+ # RPC.dir
+ CALL = 0
+@@ -44,9 +44,12 @@
+             self.data = self.data[4:4+n]
+         def __len__(self):
+             return 8 + len(self.data)
++
+         def __str__(self):
++            return str(self.__bytes__())
++        def __bytes__(self):
+             return self.pack_hdr() + struct.pack('>I', len(self.data)) + \
+-                   str(self.data)
++                   bytes(self.data)
+     
+     class Call(dpkt.Packet):
+         __hdr__ = (
+@@ -61,12 +64,16 @@
+             self.verf = RPC.Auth(self.data[len(self.cred):])
+             self.data = self.data[len(self.cred) + len(self.verf):]
+         def __len__(self):
+-            return len(str(self)) # XXX
++            return len(bytes(self)) # XXX
++
+         def __str__(self):
+-            return dpkt.Packet.__str__(self) + \
+-                   str(getattr(self, 'cred', RPC.Auth())) + \
+-                   str(getattr(self, 'verf', RPC.Auth())) + \
+-                   str(self.data)
++            return str(self.__bytes__())
++
++        def __bytes__(self):
++            return dpkt.Packet.__bytes__(self) + \
++                   bytes(getattr(self, 'cred', RPC.Auth())) + \
++                   bytes(getattr(self, 'verf', RPC.Auth())) + \
++                   bytes(self.data)
+     
+     class Reply(dpkt.Packet):
+         __hdr__ = (('stat', 'I', MSG_ACCEPTED), )
+@@ -86,11 +93,14 @@
+                 if self.stat == PROG_MISMATCH: n = 8
+                 else: n = 0
+                 return len(self.verf) + 4 + n + len(self.data)
++
+             def __str__(self):
++                return str(self.__bytes__())
++            def __bytes__(self):
+                 if self.stat == PROG_MISMATCH:
+-                    return str(self.verf) + struct.pack('>III', self.stat,
++                    return bytes(self.verf) + struct.pack('>III', self.stat,
+                         self.low, self.high) + self.data
+-                return str(self.verf) + dpkt.Packet.__str__(self)
++                return bytes(self.verf) + dpkt.Packet.__bytes__(self)
+         
+         class Reject(dpkt.Packet):
+             __hdr__ = (('stat', 'I', AUTH_ERROR), )
+@@ -107,13 +117,16 @@
+                 elif self.stat == AUTH_ERROR: n =4
+                 else: n = 0
+                 return 4 + n + len(self.data)
++
+             def __str__(self):
++                return str(self.__bytes__())
++            def __bytes__(self):
+                 if self.stat == RPC_MISMATCH:
+                     return struct.pack('>III', self.stat, self.low,
+                                        self.high) + self.data
+                 elif self.stat == AUTH_ERROR:
+                     return struct.pack('>II', self.stat, self.why) + self.data
+-                return dpkt.Packet.__str__(self)
++                return dpkt.Packet.__bytes__(self)
+         
+         def unpack(self, buf):
+             dpkt.Packet.unpack(self, buf)
+@@ -139,8 +152,8 @@
+         elif buf.startswith('\x00\x00\x00\x00'):
+             break
+         else:
+-            raise dpkt.UnpackError, 'invalid XDR list'
++            raise dpkt.UnpackError('invalid XDR list')
+     return l
+ 
+ def pack_xdrlist(*args):
+-    return '\x00\x00\x00\x01'.join(map(str, args)) + '\x00\x00\x00\x00'
++    return b'\x00\x00\x00\x01'.join(map(bytes, args)) + '\x00\x00\x00\x00'
+Index: dpkt/pim.py
+===================================================================
+--- dpkt/pim.py	(revision 82)
++++ dpkt/pim.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Protocol Independent Multicast."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ class PIM(dpkt.Packet):
+     __hdr__ = (
+@@ -19,6 +19,9 @@
+     type = property(_get_type, _set_type)
+ 
+     def __str__(self):
++        return str(self.__bytes__())
++
++    def __bytes__(self):
+         if not self.sum:
+-            self.sum = dpkt.in_cksum(dpkt.Packet.__str__(self))
+-        return dpkt.Packet.__str__(self)
++            self.sum = dpkt.in_cksum(dpkt.Packet.__bytes__(self))
++        return dpkt.Packet.__bytes__(self)
+Index: dpkt/radius.py
+===================================================================
+--- dpkt/radius.py	(revision 82)
++++ dpkt/radius.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Remote Authentication Dial-In User Service."""
+ 
+-import dpkt
++from . import dpkt, compat
+ 
+ # http://www.untruth.org/~josh/security/radius/radius-auth.html
+ # RFC 2865
+@@ -14,18 +14,18 @@
+         ('len', 'H', 4),
+         ('auth', '16s', '')
+         )
+-    attrs = ''
++    attrs = b''
+     def unpack(self, buf):
+         dpkt.Packet.unpack(self, buf)
+         self.attrs = parse_attrs(self.data)
+-        self.data = ''
++        self.data = b''
+ 
+ def parse_attrs(buf):
+     """Parse attributes buffer into a list of (type, data) tuples."""
+     attrs = []
+     while buf:
+-        t = ord(buf[0])
+-        l = ord(buf[1])
++        t = compat.compat_ord(buf[0])
++        l = compat.compat_ord(buf[1])
+         if l < 2:
+             break
+         d, buf = buf[2:l], buf[l:]
+Index: dpkt/sll.py
+===================================================================
+--- dpkt/sll.py	(revision 82)
++++ dpkt/sll.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Linux libpcap "cooked" capture encapsulation."""
+ 
+-import arp, dpkt, ethernet
++from . import arp, dpkt, ethernet
+ 
+ class SLL(dpkt.Packet):
+     __hdr__ = (
+Index: dpkt/sip.py
+===================================================================
+--- dpkt/sip.py	(revision 82)
++++ dpkt/sip.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Session Initiation Protocol."""
+ 
+-import http
++from . import http
+ 
+ class Request(http.Request):
+     """SIP request."""
+Index: dpkt/telnet.py
+===================================================================
+--- dpkt/telnet.py	(revision 82)
++++ dpkt/telnet.py	(working copy)
+@@ -1,7 +1,8 @@
+ # $Id: telnet.py 23 2006-11-08 15:45:33Z dugsong $
+ 
+ """Telnet."""
+-
++from . import compat
++import struct
+ IAC    = 255	# interpret as command:
+ DONT   = 254	# you are not to use option
+ DO     = 253	# please, you use option
+@@ -27,7 +28,7 @@
+ 
+ def strip_options(buf):
+     """Return a list of lines and dict of options from telnet data."""
+-    l = buf.split(chr(IAC))
++    l = buf.split(struct.pack("B",IAC))
+     #print l
+     b = []
+     d = {}
+@@ -35,7 +36,7 @@
+     for w in l:
+         if not w:
+             continue
+-        o = ord(w[0])
++        o = compat.compat_ord(w[0])
+         if o > SB:
+             #print 'WILL/WONT/DO/DONT/IAC', `w`
+             w = w[2:]
+@@ -46,15 +47,15 @@
+         elif o == SB:
+             #print 'SB', `w`
+             subopt = True
+-            for opt in ('USER', 'DISPLAY', 'TERM'):
+-                p = w.find(opt + '\x01')
++            for opt in (b'USER', b'DISPLAY', b'TERM'):
++                p = w.find(opt + b'\x01')
+                 if p != -1:
+-                    d[opt] = w[p+len(opt)+1:].split('\x00', 1)[0]
++                    d[opt] = w[p+len(opt)+1:].split(b'\x00', 1)[0]
+             w = None
+         elif subopt:
+             w = None
+         if w:
+-            w = w.replace('\x00', '\n').splitlines()
++            w = w.replace(b'\x00', b'\n').splitlines()
+             if not w[-1]: w.pop()
+             b.extend(w)
+     return b, d
+@@ -65,13 +66,13 @@
+     class TelnetTestCase(unittest.TestCase):
+         def test_telnet(self):
+             l = []
+-            s = "\xff\xfb%\xff\xfa%\x00\x00\x00\xff\xf0\xff\xfd&\xff\xfa&\x05\xff\xf0\xff\xfa&\x01\x01\x02\xff\xf0\xff\xfb\x18\xff\xfb \xff\xfb#\xff\xfb'\xff\xfc$\xff\xfa \x0038400,38400\xff\xf0\xff\xfa#\x00doughboy.citi.umich.edu:0.0\xff\xf0\xff\xfa'\x00\x00DISPLAY\x01doughboy.citi.umich.edu:0.0\x00USER\x01dugsong\xff\xf0\xff\xfa\x18\x00XTERM\xff\xf0\xff\xfd\x03\xff\xfc\x01\xff\xfb\x1f\xff\xfa\x1f\x00P\x00(\xff\xf0\xff\xfd\x05\xff\xfb!\xff\xfd\x01fugly\r\x00yoda\r\x00bashtard\r\x00"
++            s = b"\xff\xfb%\xff\xfa%\x00\x00\x00\xff\xf0\xff\xfd&\xff\xfa&\x05\xff\xf0\xff\xfa&\x01\x01\x02\xff\xf0\xff\xfb\x18\xff\xfb \xff\xfb#\xff\xfb'\xff\xfc$\xff\xfa \x0038400,38400\xff\xf0\xff\xfa#\x00doughboy.citi.umich.edu:0.0\xff\xf0\xff\xfa'\x00\x00DISPLAY\x01doughboy.citi.umich.edu:0.0\x00USER\x01dugsong\xff\xf0\xff\xfa\x18\x00XTERM\xff\xf0\xff\xfd\x03\xff\xfc\x01\xff\xfb\x1f\xff\xfa\x1f\x00P\x00(\xff\xf0\xff\xfd\x05\xff\xfb!\xff\xfd\x01fugly\r\x00yoda\r\x00bashtard\r\x00"
+             l.append(s)
+-            s = '\xff\xfd\x01\xff\xfd\x03\xff\xfb\x18\xff\xfb\x1f\xff\xfa\x1f\x00X\x002\xff\xf0admin\r\x00\xff\xfa\x18\x00LINUX\xff\xf0foobar\r\x00enable\r\x00foobar\r\x00\r\x00show ip int Vlan 666\r\x00'
++            s = b'\xff\xfd\x01\xff\xfd\x03\xff\xfb\x18\xff\xfb\x1f\xff\xfa\x1f\x00X\x002\xff\xf0admin\r\x00\xff\xfa\x18\x00LINUX\xff\xf0foobar\r\x00enable\r\x00foobar\r\x00\r\x00show ip int Vlan 666\r\x00'
+             l.append(s)
+-            s = '\xff\xfb%\xff\xfa%\x00\x00\x00\xff\xf0\xff\xfd&\xff\xfa&\x05\xff\xf0\xff\xfa&\x01\x01\x02\xff\xf0\xff\xfb&\xff\xfb\x18\xff\xfb \xff\xfb#\xff\xfb\'\xff\xfc$\xff\xfa \x0038400,38400\xff\xf0\xff\xfa#\x00doughboy.citi.umich.edu:0.0\xff\xf0\xff\xfa\'\x00\x00DISPLAY\x01doughboy.citi.umich.edu:0.0\x00USER\x01dugsong\xff\xf0\xff\xfa\x18\x00XTERM\xff\xf0\xff\xfd\x03\xff\xfc\x01\xff\xfb"\xff\xfa"\x03\x01\x03\x00\x03b\x03\x04\x02\x0f\x05\x00\xff\xff\x07b\x1c\x08\x02\x04\tB\x1a\n\x02\x7f\x0b\x02\x15\x0c\x02\x17\r\x02\x12\x0e\x02\x16\x0f\x02\x11\x10\x02\x13\x11\x00\xff\xff\x12\x00\xff\xff\xff\xf0\xff\xfb\x1f\xff\xfa\x1f\x00P\x00(\xff\xf0\xff\xfd\x05\xff\xfb!\xff\xfa"\x01\x0f\xff\xf0\xff\xfd\x01\xff\xfe\x01\xff\xfa"\x03\x01\x80\x00\xff\xf0\xff\xfd\x01werd\r\n\xff\xfe\x01yoda\r\n\xff\xfd\x01darthvader\r\n\xff\xfe\x01'
++            s = b'\xff\xfb%\xff\xfa%\x00\x00\x00\xff\xf0\xff\xfd&\xff\xfa&\x05\xff\xf0\xff\xfa&\x01\x01\x02\xff\xf0\xff\xfb&\xff\xfb\x18\xff\xfb \xff\xfb#\xff\xfb\'\xff\xfc$\xff\xfa \x0038400,38400\xff\xf0\xff\xfa#\x00doughboy.citi.umich.edu:0.0\xff\xf0\xff\xfa\'\x00\x00DISPLAY\x01doughboy.citi.umich.edu:0.0\x00USER\x01dugsong\xff\xf0\xff\xfa\x18\x00XTERM\xff\xf0\xff\xfd\x03\xff\xfc\x01\xff\xfb"\xff\xfa"\x03\x01\x03\x00\x03b\x03\x04\x02\x0f\x05\x00\xff\xff\x07b\x1c\x08\x02\x04\tB\x1a\n\x02\x7f\x0b\x02\x15\x0c\x02\x17\r\x02\x12\x0e\x02\x16\x0f\x02\x11\x10\x02\x13\x11\x00\xff\xff\x12\x00\xff\xff\xff\xf0\xff\xfb\x1f\xff\xfa\x1f\x00P\x00(\xff\xf0\xff\xfd\x05\xff\xfb!\xff\xfa"\x01\x0f\xff\xf0\xff\xfd\x01\xff\xfe\x01\xff\xfa"\x03\x01\x80\x00\xff\xf0\xff\xfd\x01werd\r\n\xff\xfe\x01yoda\r\n\xff\xfd\x01darthvader\r\n\xff\xfe\x01'
+             l.append(s)
+-            exp = [ (['fugly', 'yoda', 'bashtard'], {'USER': 'dugsong', 'DISPLAY': 'doughboy.citi.umich.edu:0.0'}), (['admin', 'foobar', 'enable', 'foobar', '', 'show ip int Vlan 666'], {}), (['werd', 'yoda', 'darthvader'], {'USER': 'dugsong', 'DISPLAY': 'doughboy.citi.umich.edu:0.0'}) ]
+-            self.failUnless(map(strip_options, l) == exp)
++            exp = [ ([b'fugly', b'yoda', b'bashtard'], {b'USER': b'dugsong', b'DISPLAY': b'doughboy.citi.umich.edu:0.0'}), ([b'admin', b'foobar', b'enable', b'foobar', b'', b'show ip int Vlan 666'], {}), ([b'werd', b'yoda', b'darthvader'], {b'USER': b'dugsong', b'DISPLAY': b'doughboy.citi.umich.edu:0.0'}) ]
++            self.assertTrue(list(map(strip_options, l)) == exp)
+ 
+-    unittest.main()
++    unittest.main(buffer=True)
+Index: dpkt/ssl.py
+===================================================================
+--- dpkt/ssl.py	(revision 82)
++++ dpkt/ssl.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Secure Sockets Layer / Transport Layer Security."""
+ 
+-import dpkt
++from . import dpkt, compat
+ 
+ class SSL2(dpkt.Packet):
+     __hdr__ = (
+@@ -17,7 +17,7 @@
+             self.msg, self.data = self.data[:n], self.data[n:]
+         else:
+             n = self.len = self.len & 0x3FFF
+-            padlen = ord(self.data[0])
++            padlen = compat.compat_ord(self.data[0])
+             self.msg = self.data[1:1+n]
+             self.pad = self.data[1+n:1+n+padlen]
+             self.data = self.data[1+n+padlen:]
+Index: dpkt/dpkt.py
+===================================================================
+--- dpkt/dpkt.py	(revision 82)
++++ dpkt/dpkt.py	(working copy)
+@@ -4,6 +4,7 @@
+ """Simple packet creation and parsing."""
+ 
+ import copy, itertools, socket, struct
++from . import compat
+ 
+ class Error(Exception): pass
+ class UnpackError(Error): pass
+@@ -22,11 +23,11 @@
+             t.__hdr_fmt__ = getattr(t, '__byte_order__', '>') + \
+                             ''.join([ x[1] for x in st ])
+             t.__hdr_len__ = struct.calcsize(t.__hdr_fmt__)
+-            t.__hdr_defaults__ = dict(zip(
+-                t.__hdr_fields__, [ x[2] for x in st ]))
++            t.__hdr_defaults__ = dict(list(zip(
++                t.__hdr_fields__, [ x[2] for x in st ])))
+         return t
+ 
+-class Packet(object):
++class Packet(_MetaPacket("NewBase", (object,), {})):
+     """Base packet class, with metaclass magic to generate members from
+     self.__hdr__.
+ 
+@@ -54,7 +55,6 @@
+     >>> Foo('hello, world!')
+     Foo(baz=' wor', foo=1751477356L, bar=28460, data='ld!')
+     """
+-    __metaclass__ = _MetaPacket
+     
+     def __init__(self, *args, **kwargs):
+         """Packet constructor with ([buf], [field=val,...]) prototype.
+@@ -66,7 +66,7 @@
+         Optional keyword arguments correspond to members to set
+         (matching fields in self.__hdr__, or 'data').
+         """
+-        self.data = ''
++        self.data = b''
+         if args:
+             try:
+                 self.unpack(args[0])
+@@ -78,7 +78,7 @@
+         else:
+             for k in self.__hdr_fields__:
+                 setattr(self, k, copy.copy(self.__hdr_defaults__[k]))
+-            for k, v in kwargs.iteritems():
++            for k, v in kwargs.items():
+                 setattr(self, k, v)
+ 
+     def __len__(self):
+@@ -97,7 +97,10 @@
+         return '%s(%s)' % (self.__class__.__name__, ', '.join(l))
+ 
+     def __str__(self):
+-        return self.pack_hdr() + str(self.data)
++        return str(self.__bytes__())
++
++    def __bytes__(self):
++        return self.pack_hdr() + bytes(self.data)
+     
+     def pack_hdr(self):
+         """Return packed header string."""
+@@ -114,16 +117,16 @@
+                     vals.append(v)
+             try:
+                 return struct.pack(self.__hdr_fmt__, *vals)
+-            except struct.error, e:
++            except struct.error as e:
+                 raise PackError(str(e))
+ 
+     def pack(self):
+         """Return packed header + self.data string."""
+-        return str(self)
++        return bytes(self)
+     
+     def unpack(self, buf):
+         """Unpack packet header fields from buf, and set self.data."""
+-        for k, v in itertools.izip(self.__hdr_fields__,
++        for k, v in zip(self.__hdr_fields__,
+             struct.unpack(self.__hdr_fmt__, buf[:self.__hdr_len__])):
+             setattr(self, k, v)
+         self.data = buf[self.__hdr_len__:]
+@@ -137,11 +140,11 @@
+     res = []
+     while buf:
+         line, buf = buf[:length], buf[length:]
+-        hexa = ' '.join(['%02x' % ord(x) for x in line])
++        hexa = b' '.join(['%02x' % compat.compat_ord(x) for x in line])
+         line = line.translate(__vis_filter)
+         res.append('  %04d:  %-*s %s' % (n, length * 3, hexa, line))
+         n += length
+-    return '\n'.join(res)
++    return b'\n'.join(res)
+ 
+ try:
+     import dnet
+@@ -153,7 +156,7 @@
+     import array
+     def in_cksum_add(s, buf):
+         n = len(buf)
+-        cnt = (n / 2) * 2
++        cnt = int((n / 2) * 2)
+         a = array.array('H', buf[:cnt])
+         if cnt != n:
+             a.append(struct.unpack('H', buf[-1] + '\x00')[0])
+Index: dpkt/stp.py
+===================================================================
+--- dpkt/stp.py	(revision 82)
++++ dpkt/stp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Spanning Tree Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ class STP(dpkt.Packet):
+     __hdr__ = (
+Index: dpkt/aim.py
+===================================================================
+--- dpkt/aim.py	(revision 82)
++++ dpkt/aim.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """AOL Instant Messenger."""
+ 
+-import dpkt
++from . import dpkt
+ import struct
+ 
+ # OSCAR: http://iserverd1.khstu.ru/oscar/
+@@ -19,7 +19,7 @@
+         if self.ast != 0x2a:
+             raise dpkt.UnpackError('invalid FLAP header')
+         if len(self.data) < self.len:
+-            raise dpkt.NeedData, '%d left, %d needed' % (len(self.data), self.len)
++            raise dpkt.NeedData('%d left, %d needed' % (len(self.data), self.len))
+ 
+ class SNAC(dpkt.Packet):
+     __hdr__ = (
+Index: dpkt/rfb.py
+===================================================================
+--- dpkt/rfb.py	(revision 82)
++++ dpkt/rfb.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Remote Framebuffer Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ # Remote Framebuffer Protocol
+ # http://www.realvnc.com/docs/rfbproto.pdf
+Index: dpkt/gzip.py
+===================================================================
+--- dpkt/gzip.py	(revision 82)
++++ dpkt/gzip.py	(working copy)
+@@ -3,7 +3,7 @@
+ """GNU zip."""
+ 
+ import struct, zlib
+-import dpkt
++from . import dpkt
+ 
+ # RFC 1952
+ GZIP_MAGIC	= '\x1f\x8b'
+@@ -86,7 +86,7 @@
+         l = []
+         if self.extra:
+             self.flags |= GZIP_FEXTRA
+-            s = str(self.extra)
++            s = bytes(self.extra)
+             l.append(struct.pack('>H', len(s)))
+             l.append(s)
+         if self.filename:
+@@ -98,7 +98,7 @@
+             l.append(self.comment)
+             l.append('\x00')
+         l.insert(0, super(Gzip, self).pack_hdr())
+-        return ''.join(l)
++        return b''.join(l)
+ 
+     def compress(self):
+         """Compress self.data."""
+@@ -114,4 +114,4 @@
+ if __name__ == '__main__':
+     import sys
+     gz = Gzip(open(sys.argv[1]).read())
+-    print `gz`, `gz.decompress()`
++    print(repr(gz), repr(gz.decompress()))
+Index: dpkt/ethernet.py
+===================================================================
+--- dpkt/ethernet.py	(revision 82)
++++ dpkt/ethernet.py	(working copy)
+@@ -4,7 +4,7 @@
+ with automatic 802.1q, MPLS, PPPoE, and Cisco ISL decapsulation."""
+ 
+ import struct
+-import dpkt, stp
++from . import dpkt, stp, compat
+ 
+ ETH_CRC_LEN	= 4
+ ETH_HDR_LEN	= 14
+@@ -95,7 +95,7 @@
+                 self._unpack_data(self.data[8:])
+             else:
+                 # non-SNAP
+-                dsap = ord(self.data[0])
++                dsap = compat.compat_ord(self.data[0])
+                 if dsap == 0x06: # SAP_IP
+                     self.data = self.ip = self._typesw[ETH_TYPE_IP](self.data[3:])
+                 elif dsap == 0x10 or dsap == 0xe0: # SAP_NETWARE{1,2}
+@@ -114,7 +114,7 @@
+ # XXX - auto-load Ethernet dispatch table from ETH_TYPE_* definitions
+ def __load_types():
+     g = globals()
+-    for k, v in g.iteritems():
++    for k, v in g.items():
+         if k.startswith('ETH_TYPE_'):
+             name = k[9:]
+             modname = name.lower()
+@@ -132,7 +132,7 @@
+ 
+     class EthTestCase(unittest.TestCase):
+         def test_eth(self):
+-            s = '\x00\xb0\xd0\xe1\x80r\x00\x11$\x8c\x11\xde\x86\xdd`\x00\x00\x00\x00(\x06@\xfe\x80\x00\x00\x00\x00\x00\x00\x02\x11$\xff\xfe\x8c\x11\xde\xfe\x80\x00\x00\x00\x00\x00\x00\x02\xb0\xd0\xff\xfe\xe1\x80r\xcd\xd3\x00\x16\xffP\xd7\x13\x00\x00\x00\x00\xa0\x02\xff\xffg\xd3\x00\x00\x02\x04\x05\xa0\x01\x03\x03\x00\x01\x01\x08\n}\x18:a\x00\x00\x00\x00'
++            s = b'\x00\xb0\xd0\xe1\x80r\x00\x11$\x8c\x11\xde\x86\xdd`\x00\x00\x00\x00(\x06@\xfe\x80\x00\x00\x00\x00\x00\x00\x02\x11$\xff\xfe\x8c\x11\xde\xfe\x80\x00\x00\x00\x00\x00\x00\x02\xb0\xd0\xff\xfe\xe1\x80r\xcd\xd3\x00\x16\xffP\xd7\x13\x00\x00\x00\x00\xa0\x02\xff\xffg\xd3\x00\x00\x02\x04\x05\xa0\x01\x03\x03\x00\x01\x01\x08\n}\x18:a\x00\x00\x00\x00'
+             eth = Ethernet(s)
+ 
+     unittest.main()
+Index: dpkt/http.py
+===================================================================
+--- dpkt/http.py	(revision 82)
++++ dpkt/http.py	(working copy)
+@@ -3,8 +3,8 @@
+ """Hypertext Transfer Protocol."""
++from . import dpkt
++import io, struct
+ 
+-import cStringIO
+-import dpkt
+
+ def parse_headers(f):
+     """Return dict of HTTP headers parsed from a file object."""
+     d = {}
+@@ -18,3 +18,3 @@
+         l = line.split(None, 1)
+-        if not l[0].endswith(':'):
++        if not l[0].endswith(b':'):
+             raise dpkt.UnpackError('invalid header: %r' % line)
+@@ -30,7 +30,7 @@
+ 
+ def parse_body(f, headers):
+     """Return HTTP body parsed from a file object, given HTTP header dict."""
+-    if headers.get('transfer-encoding', '').lower() == 'chunked':
++    if headers.get(b'transfer-encoding', '').lower() == b'chunked':
+         l = []
+         found_end = False
+         while 1:
+@@ -50,22 +50,21 @@
+                 break
+         if not found_end:
+             raise dpkt.NeedData('premature end of chunked body')
+-        body = ''.join(l)
+-    elif 'content-length' in headers:
+-        n = int(headers['content-length'])
++        body = b''.join(l)
++    elif b'content-length' in headers:
++        n = int(headers[b'content-length'])
+         body = f.read(n)
+         if len(body) != n:
+             raise dpkt.NeedData('short body (missing %d bytes)' % (n - len(body)))
+-    elif 'content-type' in headers:
++    elif b'content-type' in headers:
+         body = f.read()
+     else:
+         # XXX - need to handle HTTP/0.9
+-        body = ''
++        body = b''
+     return body
+ 
+-class Message(dpkt.Packet):
++class Message(type("NewBase", (dpkt.Packet,), {})):
+     """Hypertext Transfer Protocol headers + body."""
+-    __metaclass__ = type
+     __hdr_defaults__ = {}
+     headers = None
+     body = None
+@@ -75,14 +74,15 @@
+             self.unpack(args[0])
+         else:
+             self.headers = {}
+-            self.body = ''
+-            for k, v in self.__hdr_defaults__.iteritems():
++            self.body = b''
++            self.data = b''
++            for k, v in self.__hdr_defaults__.items():
+                 setattr(self, k, v)
+-            for k, v in kwargs.iteritems():
++            for k, v in kwargs.items():
+                 setattr(self, k, v)
+     
+     def unpack(self, buf):
+-        f = cStringIO.StringIO(buf)
++        f = io.BytesIO(buf)
+         # Parse headers
+         self.headers = parse_headers(f)
+         # Parse body
+@@ -134,19 +134,21 @@
+         Message.unpack(self, f.read())
+
+     def __str__(self):
+-        return '%s %s %s/%s\r\n' % (self.method, self.uri, self.__proto,
+-                                    self.version) + Message.__str__(self)
++        return str(self.__bytes__())
+ 
++    def __bytes__(self):
++        return self.method + b' ' + self.uri + b' ' + self.__proto + b'/' + self.version + b'\r\n' + Message.__bytes__(self)
++
+ class Response(Message):
+     """Hypertext Transfer Protocol Response."""
+     __hdr_defaults__ = {
+-        'version':'1.0',
+-        'status':'200',
+-        'reason':'OK'
++        'version':b'1.0',
++        'status':b'200',
++        'reason':b'OK'
+         }
+-    __proto = 'HTTP'
++    __proto = b'HTTP'
+     
+     def unpack(self, buf):
+-        f = cStringIO.StringIO(buf)
++        f = io.BytesIO(buf)
+         line = f.readline()
+         l = line.strip().split(None, 2)
+@@ -156,11 +158,12 @@
+         self.status = l[1]
+         self.reason = l[2]
+         Message.unpack(self, f.read())
+ 
+-    def __str__(self):
+-        return '%s/%s %s %s\r\n' % (self.__proto, self.version, self.status,
+-                                    self.reason) + Message.__str__(self)
++        return str(self.__bytes__())
+ 
++    def __bytes__(self):
++        return self.__proto + b'/' + self.version + b' ' + self.status + b' ' + self.reason + b'\r\n' + Message.__bytes__(self)
++
+ if __name__ == '__main__':
+     import unittest
+
+Index: dpkt/qq.py
+===================================================================
+--- dpkt/qq.py	(revision 82)
++++ dpkt/qq.py	(working copy)
+@@ -1,6 +1,6 @@
+ # $Id: qq.py 48 2008-05-27 17:31:15Z yardley $
+
+-from dpkt import Packet
++from .dpkt import Packet
+ 
+ # header_type
+ QQ_HEADER_BASIC_FAMILY = 0x02
+Index: dpkt/tpkt.py
+===================================================================
+--- dpkt/tpkt.py	(revision 82)
++++ dpkt/tpkt.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """ISO Transport Service on top of the TCP (TPKT)."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ # TPKT - RFC 1006 Section 6
+ # http://www.faqs.org/rfcs/rfc1006.html
+Index: dpkt/tcp.py
+===================================================================
+--- dpkt/tcp.py	(revision 82)
++++ dpkt/tcp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Transmission Control Protocol."""
+ 
+-import dpkt
++from . import dpkt, compat
+ 
+ # TCP control flags
+ TH_FIN		= 0x01		# end of data
+@@ -21,7 +21,7 @@
+     __hdr__ = (
+         ('sport', 'H', 0xdead),
+         ('dport', 'H', 0),
+-        ('seq', 'I', 0xdeadbeefL),
++        ('seq', 'I', 0xdeadbeef),
+         ('ack', 'I', 0),
+         ('off_x2', 'B', ((5 << 4) | 0)),
+         ('flags', 'B', TH_SYN),
+@@ -29,7 +29,7 @@
+         ('sum', 'H', 0),
+         ('urp', 'H', 0)
+         )
+-    opts = ''
++    opts = b''
+     
+     def _get_off(self): return self.off_x2 >> 4
+     def _set_off(self, off): self.off_x2 = (off << 4) | (self.off_x2 & 0xf)
+@@ -37,15 +37,18 @@
+ 
+     def __len__(self):
+         return self.__hdr_len__ + len(self.opts) + len(self.data)
+-    
++
+     def __str__(self):
+-        return self.pack_hdr() + self.opts + str(self.data)
++        return str(self.__bytes__())
+     
++    def __bytes__(self):
++        return self.pack_hdr() + bytes(self.opts) + bytes(self.data)
++    
+     def unpack(self, buf):
+         dpkt.Packet.unpack(self, buf)
+         ol = ((self.off_x2 >> 4) << 2) - self.__hdr_len__
+         if ol < 0:
+-            raise dpkt.UnpackError, 'invalid header length'
++            raise dpkt.UnpackError('invalid header length')
+         self.opts = buf[self.__hdr_len__:self.__hdr_len__ + ol]
+         self.data = buf[self.__hdr_len__ + ol:]
+ 
+@@ -82,17 +85,17 @@
+     """Parse TCP option buffer into a list of (option, data) tuples."""
+     opts = []
+     while buf:
+-        o = ord(buf[0])
++        o = compat.compat_ord(buf[0])
+         if o > TCP_OPT_NOP:
+             try:
+-                l = ord(buf[1])
++                l = compat.compat_ord(buf[1])
+                 d, buf = buf[2:l], buf[l:]
+             except ValueError:
+                 #print 'bad option', repr(str(buf))
+                 opts.append(None) # XXX
+                 break
+         else:
+-            d, buf = '', buf[1:]
++            d, buf = b'', buf[1:]
+         opts.append((o,d))
+     return opts
+ 
+Index: dpkt/dtp.py
+===================================================================
+--- dpkt/dtp.py	(revision 82)
++++ dpkt/dtp.py	(working copy)
+@@ -3,7 +3,7 @@
+ """Dynamic Trunking Protocol."""
+ 
+ import struct
+-import dpkt
++from . import dpkt
+ 
+ class DTP(dpkt.Packet):
+     __hdr__ = (
+Index: dpkt/icmp.py
+===================================================================
+--- dpkt/icmp.py	(revision 82)
++++ dpkt/icmp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Internet Control Message Protocol."""
+ 
+-import dpkt, ip
++from . import dpkt, ip
+ 
+ # Types (icmp_type) and codes (icmp_code) -
+ # http://www.iana.org/assignments/icmp-parameters
+@@ -106,17 +106,20 @@
+             pass
+ 
+     def __str__(self):
++        return str(self.__bytes__())
++
++    def __bytes__(self):
+         if not self.sum:
+-            self.sum = dpkt.in_cksum(dpkt.Packet.__str__(self))
+-        return dpkt.Packet.__str__(self)
++            self.sum = dpkt.in_cksum(dpkt.Packet.__bytes__(self))
++        return dpkt.Packet.__bytes__(self)
+ 
+ if __name__ == '__main__':
+     import unittest
+ 
+     class ICMPTestCase(unittest.TestCase):
+         def test_ICMP(self):
+-            s = '\x03\x0a\x6b\x19\x00\x00\x00\x00\x45\x00\x00\x28\x94\x1f\x00\x00\xe3\x06\x99\xb4\x23\x2b\x24\x00\xde\x8e\x84\x42\xab\xd1\x00\x50\x00\x35\xe1\x29\x20\xd9\x00\x00\x00\x22\x9b\xf0\xe2\x04\x65\x6b'
++            s = b'\x03\x0a\x6b\x19\x00\x00\x00\x00\x45\x00\x00\x28\x94\x1f\x00\x00\xe3\x06\x99\xb4\x23\x2b\x24\x00\xde\x8e\x84\x42\xab\xd1\x00\x50\x00\x35\xe1\x29\x20\xd9\x00\x00\x00\x22\x9b\xf0\xe2\x04\x65\x6b'
+             icmp = ICMP(s)
+-            self.failUnless(str(icmp) == s)
++            self.assertTrue(bytes(icmp) == s)
+ 
+     unittest.main()
+Index: dpkt/sccp.py
+===================================================================
+--- dpkt/sccp.py	(revision 82)
++++ dpkt/sccp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Cisco Skinny Client Control Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ KEYPAD_BUTTON		= 0x00000003
+ OFF_HOOK		= 0x00000006
+@@ -114,7 +114,7 @@
+         ('line_id', 'I', 1),
+         ('call_id', 'I', 0),
+         ('softkey_set', 'I', 8),
+-        ('softkey_map', 'I', 0xffffffffL)
++        ('softkey_map', 'I', 0xffffffff)
+         )
+ 
+ class SetLamp(dpkt.Packet):
+Index: dpkt/ah.py
+===================================================================
+--- dpkt/ah.py	(revision 82)
++++ dpkt/ah.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Authentication Header."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ class AH(dpkt.Packet):
+     __hdr__ = (
+@@ -12,12 +12,12 @@
+         ('spi', 'I', 0),
+         ('seq', 'I', 0)
+         )
+-    auth = ''
++    auth = b''
+     def unpack(self, buf):
+         dpkt.Packet.unpack(self, buf)
+         self.auth = self.data[:self.len]
+         buf = self.data[self.len:]
+-        import ip
++        from . import ip
+         try:
+             self.data = ip.IP.get_proto(self.nxt)(buf)
+             setattr(self, self.data.__class__.__name__.lower(), self.data)
+@@ -28,4 +28,7 @@
+         return self.__hdr_len__ + len(self.auth) + len(self.data)
+ 
+     def __str__(self):
+-        return self.pack_hdr() + str(self.auth) + str(self.data)
++        return str(self.__bytes__())
++
++    def __bytes__(self):
++        return self.pack_hdr() + self.auth + bytes(self.data)
+Index: dpkt/stun.py
+===================================================================
+--- dpkt/stun.py	(revision 82)
++++ dpkt/stun.py	(working copy)
+@@ -3,7 +3,7 @@
+ """Simple Traversal of UDP through NAT."""
+ 
+ import struct
+-import dpkt
++from . import dpkt
+ 
+ # STUN - RFC 3489
+ # http://tools.ietf.org/html/rfc3489
+Index: dpkt/diameter.py
+===================================================================
+--- dpkt/diameter.py	(revision 82)
++++ dpkt/diameter.py	(working copy)
+@@ -3,7 +3,7 @@
+ """Diameter."""
+ 
+ import struct
+-import dpkt
++from . import dpkt, compat
+ 
+ # Diameter Base Protocol - RFC 3588
+ # http://tools.ietf.org/html/rfc3588
+@@ -54,12 +54,12 @@
+ 
+     def unpack(self, buf):
+         dpkt.Packet.unpack(self, buf)
+-        self.cmd = (ord(self.cmd[0]) << 16) | \
+-                   (ord(self.cmd[1]) << 8) | \
+-                    ord(self.cmd[2])
+-        self.len = (ord(self.len[0]) << 16) | \
+-                   (ord(self.len[1]) << 8) | \
+-                   ord(self.len[2])
++        self.cmd = (compat.compat_ord(self.cmd[0]) << 16) | \
++                   (compat.compat_ord(self.cmd[1]) << 8) | \
++                    compat.compat_ord(self.cmd[2])
++        self.len = (compat.compat_ord(self.len[0]) << 16) | \
++                   (compat.compat_ord(self.len[1]) << 8) | \
++                   compat.compat_ord(self.len[2])
+         self.data = self.data[:self.len - self.__hdr_len__]
+ 
+         l = []
+@@ -70,12 +70,12 @@
+         self.data = self.avps = l
+ 
+     def pack_hdr(self):
+-        self.len = chr((self.len >> 16) & 0xff) + \
+-                   chr((self.len >> 8) & 0xff) + \
+-                   chr(self.len & 0xff)
+-        self.cmd = chr((self.cmd >> 16) & 0xff) + \
+-                   chr((self.cmd >> 8) & 0xff) + \
+-                   chr(self.cmd & 0xff)
++        self.len = struct.pack("3B",((self.len >> 16) & 0xff), \
++                   ((self.len >> 8) & 0xff), \
++                   (self.len & 0xff))
++        self.cmd = struct.pack("3B",((self.cmd >> 16) & 0xff), \
++                   ((self.cmd >> 8) & 0xff), \
++                   (self.cmd & 0xff))
+         return dpkt.Packet.pack_hdr(self)
+ 
+     def __len__(self):
+@@ -83,8 +83,11 @@
+                sum(map(len, self.data))
+ 
+     def __str__(self):
++        return str(self.__bytes__())
++
++    def __bytes__(self):
+         return self.pack_hdr() + \
+-               ''.join(map(str, self.data))
++               b''.join(map(bytes, self.data))
+ 
+ class AVP(dpkt.Packet):
+     __hdr__ = (
+@@ -113,9 +116,9 @@
+ 
+     def unpack(self, buf):
+         dpkt.Packet.unpack(self, buf)
+-        self.len = (ord(self.len[0]) << 16) | \
+-                   (ord(self.len[1]) << 8) | \
+-                    ord(self.len[2])
++        self.len = (compat.compat_ord(self.len[0]) << 16) | \
++                   (compat.compat_ord(self.len[1]) << 8) | \
++                    compat.compat_ord(self.len[2])
+ 
+         if self.vendor_flag:
+             self.vendor = struct.unpack('>I', self.data[:4])[0]
+@@ -124,9 +127,9 @@
+             self.data = self.data[:self.len - self.__hdr_len__]
+ 
+     def pack_hdr(self):
+-        self.len = chr((self.len >> 16) & 0xff) + \
+-                   chr((self.len >> 8) & 0xff) + \
+-                   chr(self.len & 0xff)
++        self.len = struct.pack("3B",((self.len >> 16) & 0xff), \
++                   ((self.len >> 8) & 0xff), \
++                   (self.len & 0xff))
+         data = dpkt.Packet.pack_hdr(self)
+         if self.vendor_flag:
+             data += struct.pack('>I', self.vendor)
+@@ -134,7 +137,7 @@
+ 
+     def __len__(self):
+         length = self.__hdr_len__ + \
+-                 sum(map(len, self.data))
++                 len(self.data)
+         if self.vendor_flag:
+             length += 4
+         return length
+@@ -146,36 +149,36 @@
+     class DiameterTestCase(unittest.TestCase):
+         def testPack(self):
+             d = Diameter(self.s)
+-            self.failUnless(self.s == str(d))
++            self.assertTrue(self.s == bytes(d))
+             d = Diameter(self.t)
+-            self.failUnless(self.t == str(d))
++            self.assertTrue(self.t == bytes(d))
+ 
+         def testUnpack(self):
+             d = Diameter(self.s)
+-            self.failUnless(d.len == 40)
+-            #self.failUnless(d.cmd == DEVICE_WATCHDOG_REQUEST)
+-            self.failUnless(d.request_flag == 1)
+-            self.failUnless(d.error_flag == 0)
+-            self.failUnless(len(d.avps) == 2)
++            self.assertTrue(d.len == 40)
++            #self.assertTrue(d.cmd == DEVICE_WATCHDOG_REQUEST)
++            self.assertTrue(d.request_flag == 1)
++            self.assertTrue(d.error_flag == 0)
++            self.assertTrue(len(d.avps) == 2)
+ 
+             avp = d.avps[0]
+-            #self.failUnless(avp.code == ORIGIN_HOST)
+-            self.failUnless(avp.mandatory_flag == 1)
+-            self.failUnless(avp.vendor_flag == 0)
+-            self.failUnless(avp.len == 12)
+-            self.failUnless(len(avp) == 12)
+-            self.failUnless(avp.data == '\x68\x30\x30\x32')
++            #self.assertTrue(avp.code == ORIGIN_HOST)
++            self.assertTrue(avp.mandatory_flag == 1)
++            self.assertTrue(avp.vendor_flag == 0)
++            self.assertTrue(avp.len == 12)
++            self.assertTrue(len(avp) == 12)
++            self.assertTrue(avp.data == b'\x68\x30\x30\x32')
+ 
+             # also test the optional vendor id support
+             d = Diameter(self.t)
+-            self.failUnless(d.len == 44)
++            self.assertTrue(d.len == 44)
+             avp = d.avps[0]
+-            self.failUnless(avp.vendor_flag == 1)
+-            self.failUnless(avp.len == 16)
+-            self.failUnless(len(avp) == 16)
+-            self.failUnless(avp.vendor == 3735928559)
+-            self.failUnless(avp.data == '\x68\x30\x30\x32')
++            self.assertTrue(avp.vendor_flag == 1)
++            self.assertTrue(avp.len == 16)
++            self.assertTrue(len(avp) == 16)
++            self.assertTrue(avp.vendor == 3735928559)
++            self.assertTrue(avp.data == b'\x68\x30\x30\x32')
+ 
+-        s = '\x01\x00\x00\x28\x80\x00\x01\x18\x00\x00\x00\x00\x00\x00\x41\xc8\x00\x00\x00\x0c\x00\x00\x01\x08\x40\x00\x00\x0c\x68\x30\x30\x32\x00\x00\x01\x28\x40\x00\x00\x08'
+-        t = '\x01\x00\x00\x2c\x80\x00\x01\x18\x00\x00\x00\x00\x00\x00\x41\xc8\x00\x00\x00\x0c\x00\x00\x01\x08\xc0\x00\x00\x10\xde\xad\xbe\xef\x68\x30\x30\x32\x00\x00\x01\x28\x40\x00\x00\x08'
++        s = b'\x01\x00\x00\x28\x80\x00\x01\x18\x00\x00\x00\x00\x00\x00\x41\xc8\x00\x00\x00\x0c\x00\x00\x01\x08\x40\x00\x00\x0c\x68\x30\x30\x32\x00\x00\x01\x28\x40\x00\x00\x08'
++        t = b'\x01\x00\x00\x2c\x80\x00\x01\x18\x00\x00\x00\x00\x00\x00\x41\xc8\x00\x00\x00\x0c\x00\x00\x01\x08\xc0\x00\x00\x10\xde\xad\xbe\xef\x68\x30\x30\x32\x00\x00\x01\x28\x40\x00\x00\x08'
+     unittest.main()
+Index: dpkt/igmp.py
+===================================================================
+--- dpkt/igmp.py	(revision 82)
++++ dpkt/igmp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Internet Group Management Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ class IGMP(dpkt.Packet):
+     __hdr__ = (
+@@ -11,7 +11,11 @@
+         ('sum', 'H', 0),
+         ('group', 'I', 0)
+         )
++
+     def __str__(self):
++        return str(self.__bytes__())
++
++    def __bytes__(self):
+         if not self.sum:
+-            self.sum = dpkt.in_cksum(dpkt.Packet.__str__(self))
+-        return dpkt.Packet.__str__(self)
++            self.sum = dpkt.in_cksum(dpkt.Packet.__bytes__(self))
++        return dpkt.Packet.__bytes__(self)
+Index: dpkt/pmap.py
+===================================================================
+--- dpkt/pmap.py	(revision 82)
++++ dpkt/pmap.py	(working copy)
+@@ -2,9 +2,9 @@
+ 
+ """Portmap / rpcbind."""
+ 
+-import dpkt
++from . import dpkt
+ 
+-PMAP_PROG = 100000L
++PMAP_PROG = 100000
+ PMAP_PROCDUMP = 4
+ PMAP_VERS = 2
+ 
+Index: dpkt/ppp.py
+===================================================================
+--- dpkt/ppp.py	(revision 82)
++++ dpkt/ppp.py	(working copy)
+@@ -3,7 +3,7 @@
+ """Point-to-Point Protocol."""
+ 
+ import struct
+-import dpkt
++from . import dpkt
+ 
+ # XXX - finish later
+ 
+@@ -44,12 +44,12 @@
+             if self.p > 0xff:
+                 return struct.pack('>H', self.p)
+             return dpkt.Packet.pack_hdr(self)
+-        except struct.error, e:
++        except struct.error as e:
+             raise dpkt.PackError(str(e))
+ 
+ def __load_protos():
+     g = globals()
+-    for k, v in g.iteritems():
++    for k, v in g.items():
+         if k.startswith('PPP_'):
+             name = k[4:]
+             modname = name.lower()
+Index: dpkt/ip.py
+===================================================================
+--- dpkt/ip.py	(revision 82)
++++ dpkt/ip.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Internet Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ class IP(dpkt.Packet):
+     __hdr__ = (
+@@ -18,7 +18,7 @@
+         ('dst', '4s', '\x00' * 4)
+         )
+     _protosw = {}
+-    opts = ''
++    opts = b''
+ 
+     def _get_v(self): return self.v_hl >> 4
+     def _set_v(self, v): self.v_hl = (v << 4) | (self.v_hl & 0xf)
+@@ -30,15 +30,18 @@
+ 
+     def __len__(self):
+         return self.__hdr_len__ + len(self.opts) + len(self.data)
++
++    def __str__(self):
++        return str(self.__bytes__())
+     
+-    def __str__(self):
++    def __bytes__(self):
+         if self.sum == 0:
+             self.sum = dpkt.in_cksum(self.pack_hdr() + self.opts)
+             if (self.p == 6 or self.p == 17) and \
+                (self.off & (IP_MF|IP_OFFMASK)) == 0 and \
+                isinstance(self.data, dpkt.Packet) and self.data.sum == 0:
+                 # Set zeroed TCP and UDP checksums for non-fragments.
+-                p = str(self.data)
++                p = bytes(self.data)
+                 s = dpkt.struct.pack('>4s4sxBH', self.src, self.dst,
+                                      self.p, len(p))
+                 s = dpkt.in_cksum_add(0, s)
+@@ -47,13 +50,13 @@
+                 if self.p == 17 and self.data.sum == 0:
+                     self.data.sum = 0xffff	# RFC 768
+                 # XXX - skip transports which don't need the pseudoheader
+-        return self.pack_hdr() + self.opts + str(self.data)
++        return self.pack_hdr() + bytes(self.opts) + bytes(self.data)
+     
+     def unpack(self, buf):
+         dpkt.Packet.unpack(self, buf)
+         ol = ((self.v_hl & 0xf) << 2) - self.__hdr_len__
+         if ol < 0:
+-            raise dpkt.UnpackError, 'invalid header length'
++            raise dpkt.UnpackError('invalid header length')
+         self.opts = buf[self.__hdr_len__:self.__hdr_len__ + ol]
+         buf = buf[self.__hdr_len__ + ol:self.len]
+         try:
+@@ -242,7 +245,7 @@
+ # XXX - auto-load IP dispatch table from IP_PROTO_* definitions
+ def __load_protos():
+     g = globals()
+-    for k, v in g.iteritems():
++    for k, v in g.items():
+         if k.startswith('IP_PROTO_'):
+             name = k[9:].lower()
+             try:
+@@ -259,32 +262,32 @@
+     
+     class IPTestCase(unittest.TestCase):
+         def test_IP(self):
+-            import udp
+-            s = 'E\x00\x00"\x00\x00\x00\x00@\x11r\xc0\x01\x02\x03\x04\x01\x02\x03\x04\x00o\x00\xde\x00\x0e\xbf5foobar'
+-            ip = IP(id=0, src='\x01\x02\x03\x04', dst='\x01\x02\x03\x04', p=17)
++            from . import udp
++            s = b'E\x00\x00"\x00\x00\x00\x00@\x11r\xc0\x01\x02\x03\x04\x01\x02\x03\x04\x00o\x00\xde\x00\x0e\xbf5foobar'
++            ip = IP(id=0, src=b'\x01\x02\x03\x04', dst=b'\x01\x02\x03\x04', p=17)
+             u = udp.UDP(sport=111, dport=222)
+-            u.data = 'foobar'
++            u.data = b'foobar'
+             u.ulen += len(u.data)
+             ip.data = u
+             ip.len += len(u)
+-            self.failUnless(str(ip) == s)
++            self.assertTrue(bytes(ip) == s)
+ 
+             ip = IP(s)
+-            self.failUnless(str(ip) == s)
+-            self.failUnless(ip.udp.sport == 111)
+-            self.failUnless(ip.udp.data == 'foobar')
++            self.assertTrue(bytes(ip) == s)
++            self.assertTrue(ip.udp.sport == 111)
++            self.assertTrue(ip.udp.data == b'foobar')
+ 
+         def test_hl(self):
+-            s = 'BB\x03\x00\x00\x00\x00\x00\x00\x00\xd0\x00\xec\xbc\xa5\x00\x00\x00\x03\x80\x00\x00\xd0\x01\xf2\xac\xa5"0\x01\x00\x14\x00\x02\x00\x0f\x00\x00\x00\x00\x00\x00\x00\x00\x00'
++            s = b'BB\x03\x00\x00\x00\x00\x00\x00\x00\xd0\x00\xec\xbc\xa5\x00\x00\x00\x03\x80\x00\x00\xd0\x01\xf2\xac\xa5"0\x01\x00\x14\x00\x02\x00\x0f\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+             try:
+                 ip = IP(s)
+             except dpkt.UnpackError:
+                 pass
+             
+         def test_opt(self):
+-            s = '\x4f\x00\x00\x50\xae\x08\x00\x00\x40\x06\x17\xfc\xc0\xa8\x0a\x26\xc0\xa8\x0a\x01\x07\x27\x08\x01\x02\x03\x04\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
++            s = b'\x4f\x00\x00\x50\xae\x08\x00\x00\x40\x06\x17\xfc\xc0\xa8\x0a\x26\xc0\xa8\x0a\x01\x07\x27\x08\x01\x02\x03\x04\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+             ip = IP(s)
+             ip.sum = 0
+-            self.failUnless(str(ip) == s)
++            self.assertTrue(bytes(ip) == s)
+ 
+     unittest.main()
+Index: dpkt/sctp.py
+===================================================================
+--- dpkt/sctp.py	(revision 82)
++++ dpkt/sctp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Stream Control Transmission Protocol."""
+ 
+-import dpkt, crc32c
++from . import dpkt, crc32c
+ 
+ # Stream Control Transmission Protocol
+ # http://tools.ietf.org/html/rfc2960
+@@ -46,13 +46,16 @@
+                sum(map(len, self.data))
+ 
+     def __str__(self):
+-        l = [ str(x) for x in self.data ]
++        return str(self.__bytes__())
++
++    def __bytes__(self):
++        l = [ bytes(x) for x in self.data ]
+         if self.sum == 0:
+-            s = crc32c.add(0xffffffffL, self.pack_hdr())
++            s = crc32c.add(0xffffffff, self.pack_hdr())
+             for x in l:
+                 s = crc32c.add(s, x)
+             self.sum = crc32c.done(s)
+-        return self.pack_hdr() + ''.join(l)
++        return self.pack_hdr() + b''.join(l)
+ 
+ class Chunk(dpkt.Packet):
+     __hdr__ = (
+@@ -71,20 +74,20 @@
+     class SCTPTestCase(unittest.TestCase):
+         def testPack(self):
+             sctp = SCTP(self.s)
+-            self.failUnless(self.s == str(sctp))
++            self.assertTrue(self.s == bytes(sctp))
+             sctp.sum = 0
+-            self.failUnless(self.s == str(sctp))
++            self.assertTrue(self.s == bytes(sctp))
+ 
+         def testUnpack(self):
+             sctp = SCTP(self.s)
+-            self.failUnless(sctp.sport == 32836)
+-            self.failUnless(sctp.dport == 80)
+-            self.failUnless(len(sctp.chunks) == 1)
+-            self.failUnless(len(sctp) == 72)
++            self.assertTrue(sctp.sport == 32836)
++            self.assertTrue(sctp.dport == 80)
++            self.assertTrue(len(sctp.chunks) == 1)
++            self.assertTrue(len(sctp) == 72)
+ 
+             chunk = sctp.chunks[0]
+-            self.failUnless(chunk.type == INIT)
+-            self.failUnless(chunk.len == 60)
++            self.assertTrue(chunk.type == INIT)
++            self.assertTrue(chunk.len == 60)
+ 
+-        s = '\x80\x44\x00\x50\x00\x00\x00\x00\x30\xba\xef\x54\x01\x00\x00\x3c\x3b\xb9\x9c\x46\x00\x01\xa0\x00\x00\x0a\xff\xff\x2b\x2d\x7e\xb2\x00\x05\x00\x08\x9b\xe6\x18\x9b\x00\x05\x00\x08\x9b\xe6\x18\x9c\x00\x0c\x00\x06\x00\x05\x00\x00\x80\x00\x00\x04\xc0\x00\x00\x04\xc0\x06\x00\x08\x00\x00\x00\x00'
++        s = b'\x80\x44\x00\x50\x00\x00\x00\x00\x30\xba\xef\x54\x01\x00\x00\x3c\x3b\xb9\x9c\x46\x00\x01\xa0\x00\x00\x0a\xff\xff\x2b\x2d\x7e\xb2\x00\x05\x00\x08\x9b\xe6\x18\x9b\x00\x05\x00\x08\x9b\xe6\x18\x9c\x00\x0c\x00\x06\x00\x05\x00\x00\x80\x00\x00\x04\xc0\x00\x00\x04\xc0\x06\x00\x08\x00\x00\x00\x00'
+     unittest.main()
+Index: dpkt/netflow.py
+===================================================================
+--- dpkt/netflow.py	(revision 82)
++++ dpkt/netflow.py	(working copy)
+@@ -3,7 +3,7 @@
+ """Cisco Netflow."""
+ 
+ import itertools, struct
+-import dpkt
++from . import dpkt
+ 
+ class NetflowBase(dpkt.Packet):
+     """Base class for Cisco Netflow packets."""
+@@ -22,7 +22,7 @@
+     def __str__(self):
+         # for now, don't try to enforce any size limits
+         self.count = len(self.data)
+-        return self.pack_hdr() + ''.join(map(str, self.data))
++        return self.pack_hdr() + b''.join(map(bytes, self.data))
+     
+     def unpack(self, buf):
+         dpkt.Packet.unpack(self, buf)
+@@ -43,12 +43,15 @@
+             return self.__hdr_len__
+ 
+         def __str__(self):
++            return str(self.__bytes__())
++
++        def __bytes__(self):
+             # don't bother with data
+             return self.pack_hdr()
+ 
+         def unpack(self, buf):
+             # don't bother with data
+-            for k, v in itertools.izip(self.__hdr_fields__,
++            for k, v in zip(self.__hdr_fields__,
+                 struct.unpack(self.__hdr_fmt__, buf[:self.__hdr_len__])):
+                 setattr(self, k, v)
+             self.data = ""
+@@ -188,7 +191,7 @@
+     import unittest
+ 
+     class NetflowV1TestCase(unittest.TestCase):
+-        sample_v1 = "\x00\x01\x00\x18gza<B\x00\xfc\x1c$\x93\x08p\xac\x01 W\xc0\xa8c\xf7\n\x00\x02\x01\x00\x03\x00\n\x00\x00\x00\x01\x00\x00\x02(gz7,gz7,\\\x1b\x00P\xac\x01\x11,\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01\x18S\xac\x18\xd9\xaa\xc0\xa82\x02\x00\x03\x00\x19\x00\x00\x00\x01\x00\x00\x05\xdcgz7|gz7|\xd8\xe3\x00P\xac\x01\x06,\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01\x14\x18\xac\x18\x8d\xcd\xc0\xa82f\x00\x03\x00\x07\x00\x00\x00\x01\x00\x00\x05\xdcgz7\x90gz7\x90\x8a\x81\x17o\xac\x01\x066\x10\x00\x00\x00\x00\x04\x00\x03\xac\x0f'$\xac\x01\xe5\x1d\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x02(gz:8gz:8\xa3Q\x126\xac)\x06\xfd\x18\x00\x00\x00\x00\x04\x00\x1b\xac\x01\x16E\xac#\x17\x8e\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x02(gz:Lgz:L\xc9\xff\x00P\xac\x1f\x06\x86\x02\x00\x00\x00\x00\x03\x00\x1b\xac\r\t\xff\xac\x01\x99\x95\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:Xgz:X\xee9\x00\x17\xac\x01\x06\xde\x10\x00\x00\x00\x00\x04\x00\x03\xac\x0eJ\xd8\xac\x01\xae/\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:hgz:h\xb3n\x00\x15\xac\x01\x06\x81\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01#8\xac\x01\xd9*\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:tgz:t\x00\x00\x83P\xac!\x01\xab\x10\x00\x00\x00\x00\x03\x00\x1b\xac\n`7\xac*\x93J\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:tgz:t\x00\x00\x00\x00\xac\x012\xa9\x10\x00\x00\x00\x00\x04\x00\x07\xac\nG\x1f\xac\x01\xfdJ\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x00(gz:\x88gz:\x88!\x99i\x87\xac\x1e\x06~\x02\x00\x00\x00\x00\x03\x00\x1b\xac\x01(\xc9\xac\x01B\xc4\xc0\xa82\x02\x00\x03\x00\x19\x00\x00\x00\x01\x00\x00\x00(gz:\x88gz:\x88}6\x00P\xac\x01\x06\xfe\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x0b\x08\xe8\xac\x01F\xe2\xc0\xa82\x02\x00\x04\x00\x19\x00\x00\x00\x01\x00\x00\x05\xdcgz:\x9cgz:\x9c`ii\x87\xac\x01\x06;\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01\x1d$\xac<\xf0\xc3\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:\x9cgz:\x9cF2\x00\x14\xac\x01\x06s\x18\x00\x00\x00\x00\x04\x00\x03\xac\x0b\x11Q\xac\x01\xde\x06\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:\xb0gz:\xb0\xef#\x1a+\xac)\x06\xe9\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x0cR\xd9\xac\x01o\xe8\xc0\xa82\x02\x00\x04\x00\x19\x00\x00\x00\x01\x00\x00\x05\xdcgz:\xc4gz:\xc4\x13n\x00n\xac\x19\x06\xa8\x10\x00\x00\x00\x00\x03\x00\x19\xac\x01=\xdd\xac\x01}\xee\xc0\xa82f\x00\x03\x00\x07\x00\x00\x00\x01\x00\x00\x00(gz:\xc4gz:\xc4\x00\x00\xdc\xbb\xac\x01\x01\xd3\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x0f(\xd1\xac\x01\xcc\xa5\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:\xd8gz:\xd8\xc5s\x17o\xac\x19\x06#\x18\x00\x00\x00\x00\x03\x00\x07\xac\n\x85[\xc0\xa8cn\n\x00\x02\x01\x00\x04\x00\n\x00\x00\x00\x01\x00\x00\x05\xdcgz:\xe4gz:\xe4\xbfl\x00P\xac\x01\x06\xcf\x10\x00\x00\x00\x00\x04\x00\x07\xac\x010\x1f\xac\x18!E\xc0\xa82f\x00\x03\x00\x07\x00\x00\x00\x01\x00\x00\x05\xdcgz;\x00gz;\x00\x11\x95\x04\xbe\xc0\xa8\x06\xea\x10\x00\x00\x00\x00\x03\x00\n\xac\x010\xb6\xac\x1e\xf4\xaa\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz;4gz;4\x88d\x00\x17\xac\x01\x06\x1f\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01#_\xac\x1e\xb0\t\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz;Hgz;H\x81S\x00P\xac \x06N\x10\x00\x00\x00\x00\x03\x00\x1b\xac\x01\x04\xd9\xac\x01\x94c\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x02(gz;\\gz;\\U\x10\x00P\xac\x01\x06P\x18\x00\x00\x00\x00\x04\x00\x1b\xac\x01<\xae\xac*\xac!\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x00\xfagz;\x84gz;\x84\x0c\xe7\x00P\xac\x01\x11\xfd\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01\x1f\x1f\xac\x17\xedi\xc0\xa82\x02\x00\x03\x00\x19\x00\x00\x00\x01\x00\x00\x05\xdcgz;\x98gz;\x98\xba\x17\x00\x16\xac\x01\x06|\x10\x00\x00\x00\x00\x03\x00\x07"
++        sample_v1 = b"\x00\x01\x00\x18gza<B\x00\xfc\x1c$\x93\x08p\xac\x01 W\xc0\xa8c\xf7\n\x00\x02\x01\x00\x03\x00\n\x00\x00\x00\x01\x00\x00\x02(gz7,gz7,\\\x1b\x00P\xac\x01\x11,\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01\x18S\xac\x18\xd9\xaa\xc0\xa82\x02\x00\x03\x00\x19\x00\x00\x00\x01\x00\x00\x05\xdcgz7|gz7|\xd8\xe3\x00P\xac\x01\x06,\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01\x14\x18\xac\x18\x8d\xcd\xc0\xa82f\x00\x03\x00\x07\x00\x00\x00\x01\x00\x00\x05\xdcgz7\x90gz7\x90\x8a\x81\x17o\xac\x01\x066\x10\x00\x00\x00\x00\x04\x00\x03\xac\x0f'$\xac\x01\xe5\x1d\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x02(gz:8gz:8\xa3Q\x126\xac)\x06\xfd\x18\x00\x00\x00\x00\x04\x00\x1b\xac\x01\x16E\xac#\x17\x8e\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x02(gz:Lgz:L\xc9\xff\x00P\xac\x1f\x06\x86\x02\x00\x00\x00\x00\x03\x00\x1b\xac\r\t\xff\xac\x01\x99\x95\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:Xgz:X\xee9\x00\x17\xac\x01\x06\xde\x10\x00\x00\x00\x00\x04\x00\x03\xac\x0eJ\xd8\xac\x01\xae/\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:hgz:h\xb3n\x00\x15\xac\x01\x06\x81\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01#8\xac\x01\xd9*\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:tgz:t\x00\x00\x83P\xac!\x01\xab\x10\x00\x00\x00\x00\x03\x00\x1b\xac\n`7\xac*\x93J\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:tgz:t\x00\x00\x00\x00\xac\x012\xa9\x10\x00\x00\x00\x00\x04\x00\x07\xac\nG\x1f\xac\x01\xfdJ\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x00(gz:\x88gz:\x88!\x99i\x87\xac\x1e\x06~\x02\x00\x00\x00\x00\x03\x00\x1b\xac\x01(\xc9\xac\x01B\xc4\xc0\xa82\x02\x00\x03\x00\x19\x00\x00\x00\x01\x00\x00\x00(gz:\x88gz:\x88}6\x00P\xac\x01\x06\xfe\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x0b\x08\xe8\xac\x01F\xe2\xc0\xa82\x02\x00\x04\x00\x19\x00\x00\x00\x01\x00\x00\x05\xdcgz:\x9cgz:\x9c`ii\x87\xac\x01\x06;\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01\x1d$\xac<\xf0\xc3\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:\x9cgz:\x9cF2\x00\x14\xac\x01\x06s\x18\x00\x00\x00\x00\x04\x00\x03\xac\x0b\x11Q\xac\x01\xde\x06\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:\xb0gz:\xb0\xef#\x1a+\xac)\x06\xe9\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x0cR\xd9\xac\x01o\xe8\xc0\xa82\x02\x00\x04\x00\x19\x00\x00\x00\x01\x00\x00\x05\xdcgz:\xc4gz:\xc4\x13n\x00n\xac\x19\x06\xa8\x10\x00\x00\x00\x00\x03\x00\x19\xac\x01=\xdd\xac\x01}\xee\xc0\xa82f\x00\x03\x00\x07\x00\x00\x00\x01\x00\x00\x00(gz:\xc4gz:\xc4\x00\x00\xdc\xbb\xac\x01\x01\xd3\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x0f(\xd1\xac\x01\xcc\xa5\xc0\xa82\x06\x00\x04\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz:\xd8gz:\xd8\xc5s\x17o\xac\x19\x06#\x18\x00\x00\x00\x00\x03\x00\x07\xac\n\x85[\xc0\xa8cn\n\x00\x02\x01\x00\x04\x00\n\x00\x00\x00\x01\x00\x00\x05\xdcgz:\xe4gz:\xe4\xbfl\x00P\xac\x01\x06\xcf\x10\x00\x00\x00\x00\x04\x00\x07\xac\x010\x1f\xac\x18!E\xc0\xa82f\x00\x03\x00\x07\x00\x00\x00\x01\x00\x00\x05\xdcgz;\x00gz;\x00\x11\x95\x04\xbe\xc0\xa8\x06\xea\x10\x00\x00\x00\x00\x03\x00\n\xac\x010\xb6\xac\x1e\xf4\xaa\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz;4gz;4\x88d\x00\x17\xac\x01\x06\x1f\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01#_\xac\x1e\xb0\t\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x05\xdcgz;Hgz;H\x81S\x00P\xac \x06N\x10\x00\x00\x00\x00\x03\x00\x1b\xac\x01\x04\xd9\xac\x01\x94c\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x02(gz;\\gz;\\U\x10\x00P\xac\x01\x06P\x18\x00\x00\x00\x00\x04\x00\x1b\xac\x01<\xae\xac*\xac!\xc0\xa82\x06\x00\x03\x00\x1b\x00\x00\x00\x01\x00\x00\x00\xfagz;\x84gz;\x84\x0c\xe7\x00P\xac\x01\x11\xfd\x10\x00\x00\x00\x00\x04\x00\x1b\xac\x01\x1f\x1f\xac\x17\xedi\xc0\xa82\x02\x00\x03\x00\x19\x00\x00\x00\x01\x00\x00\x05\xdcgz;\x98gz;\x98\xba\x17\x00\x16\xac\x01\x06|\x10\x00\x00\x00\x00\x03\x00\x07"
+ 
+         def testPack(self):
+             pass
+@@ -199,7 +202,7 @@
+             #print repr(nfv1)
+ 
+     class NetflowV5TestCase(unittest.TestCase):
+-        sample_v5 = '\x00\x05\x00\x1d\xb5\xfa\xc9\xd0:\x0bAB&Vw\xde\x9bsv1\x00\x01\x00\x00\xac\n\x86\xa6\xac\x01\xaa\xf7\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x02(\xb5\xfa\x81\x14\xb5\xfa\x81\x1452\x00P\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x91D\xac\x14C\xe4\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x00(\xb5\xfa\x9b\xbd\xb5\xfa\x9b\xbd\x00P\x85\xd7\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x17\xe2\xd7\xac\x01\x8cV\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfao\xb8\xb5\xfao\xb8v\xe8\x17o\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x0e\xf2\xe5\xac\x01\x91\xb2\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x00\xfa\xb5\xfa\x81\xee\xb5\xfa\x81\xee\xd0\xeb\x00\x15\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\nCj\xac)\xa7\t\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x02(\xb5\xfa\x85\x92\xb5\xfa\x85\x92\x8c\xb0\x005\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x96=\xac\x15\x1a\xa8\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x86\xe0\xb5\xfa\x86\xe0\xb4\xe7\x00\xc2\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01V\xd1\xac\x01\x86\x15\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa}:\xb5\xfa}:[Q\x00P\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac2\xf1\xb1\xac)\x19\xca\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x83\xc3\xb5\xfa\x83\xc3\x16,\x00\x15\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x0cA4\xac\x01\x9az\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x8d\xa7\xb5\xfa\x8d\xa7\x173\x00\x15\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x1e\xd2\x84\xac)\xd8\xd2\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x8e\x97\xb5\xfa\x8e\x977*\x17o\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x85J\xac \x11\xfc\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x02(\xb5\xfa\x884\xb5\xfa\x884\xf5\xdd\x00\x8f\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x04\x80\xac<[n\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x9dr\xb5\xfa\x9drs$\x00\x16\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\xb9J\xac"\xc9\xd7\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x00(\xb5\xfa\x90r\xb5\xfa\x90r\x0f\x8d\x00\xc2\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac*\xa3\x10\xac\x01\xb4\x19\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x00(\xb5\xfa\x92\x03\xb5\xfa\x92\x03pf\x00\x15\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\xabo\xac\x1e\x7fi\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x93\x7f\xb5\xfa\x93\x7f\x00P\x0b\x98\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x0c\n\xea\xac\x01\xa1\x15\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfay\xcf\xb5\xfay\xcf[3\x17\xe0\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\xbb\xb3\xac)u\x8c\n\x00\x02\x01\x00i\x00\xdb\x00\x00\x00\x01\x00\x00\x00\xfa\xb5\xfa\x943\xb5\xfa\x943\x00P\x1e\xca\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x0fJ`\xac\x01\xab\x94\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x02(\xb5\xfa\x87[\xb5\xfa\x87[\x9a\xd6/\xab\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac*\x0f\x93\xac\x01\xb8\xa3\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x00(\xb5\xfa\x89\xbb\xb5\xfa\x89\xbbn\xe1\x00P\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x93\xa1\xac\x16\x80\x0c\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x00(\xb5\xfa\x87&\xb5\xfa\x87&\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x83Z\xac\x1fR\xcd\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x90\r\xb5\xfa\x90\r\xf7*\x00\x8a\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x0c\xe0\xad\xac\x01\xa8V\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x9c\xf6\xb5\xfa\x9c\xf6\xe5|\x1a+\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x1e\xccT\xac<x&\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x80\xea\xb5\xfa\x80\xea\x00\x00\x00\x00\x00\x00/\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\xbb\x18\xac\x01|z\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x00\xfa\xb5\xfa\x88p\xb5\xfa\x88p\x00P\x0b}\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x17\x0er\xac\x01\x8f\xdd\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x02(\xb5\xfa\x89\xf7\xb5\xfa\x89\xf7\r\xf7\x00\x8a\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\n\xbb\x04\xac<\xb0\x15\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x90\xa9\xb5\xfa\x90\xa9\x9c\xd0\x00\x8f\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\nz?\xac)\x03\xc8\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfaue\xb5\xfaue\xee\xa6\x00P\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\xb5\x05\xc0\xa8c\x9f\n\x00\x02\x01\x00i\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa{\xc7\xb5\xfa{\xc7\x00P\x86\xa9\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac2\xa5\x1b\xac)0\xbf\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x00\xfa\xb5\xfa\x9bZ\xb5\xfa\x9bZC\xf9\x17\xe0\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00'
++        sample_v5 = b'\x00\x05\x00\x1d\xb5\xfa\xc9\xd0:\x0bAB&Vw\xde\x9bsv1\x00\x01\x00\x00\xac\n\x86\xa6\xac\x01\xaa\xf7\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x02(\xb5\xfa\x81\x14\xb5\xfa\x81\x1452\x00P\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x91D\xac\x14C\xe4\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x00(\xb5\xfa\x9b\xbd\xb5\xfa\x9b\xbd\x00P\x85\xd7\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x17\xe2\xd7\xac\x01\x8cV\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfao\xb8\xb5\xfao\xb8v\xe8\x17o\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x0e\xf2\xe5\xac\x01\x91\xb2\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x00\xfa\xb5\xfa\x81\xee\xb5\xfa\x81\xee\xd0\xeb\x00\x15\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\nCj\xac)\xa7\t\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x02(\xb5\xfa\x85\x92\xb5\xfa\x85\x92\x8c\xb0\x005\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x96=\xac\x15\x1a\xa8\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x86\xe0\xb5\xfa\x86\xe0\xb4\xe7\x00\xc2\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01V\xd1\xac\x01\x86\x15\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa}:\xb5\xfa}:[Q\x00P\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac2\xf1\xb1\xac)\x19\xca\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x83\xc3\xb5\xfa\x83\xc3\x16,\x00\x15\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x0cA4\xac\x01\x9az\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x8d\xa7\xb5\xfa\x8d\xa7\x173\x00\x15\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x1e\xd2\x84\xac)\xd8\xd2\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x8e\x97\xb5\xfa\x8e\x977*\x17o\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x85J\xac \x11\xfc\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x02(\xb5\xfa\x884\xb5\xfa\x884\xf5\xdd\x00\x8f\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x04\x80\xac<[n\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x9dr\xb5\xfa\x9drs$\x00\x16\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\xb9J\xac"\xc9\xd7\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x00(\xb5\xfa\x90r\xb5\xfa\x90r\x0f\x8d\x00\xc2\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac*\xa3\x10\xac\x01\xb4\x19\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x00(\xb5\xfa\x92\x03\xb5\xfa\x92\x03pf\x00\x15\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\xabo\xac\x1e\x7fi\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x93\x7f\xb5\xfa\x93\x7f\x00P\x0b\x98\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x0c\n\xea\xac\x01\xa1\x15\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfay\xcf\xb5\xfay\xcf[3\x17\xe0\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\xbb\xb3\xac)u\x8c\n\x00\x02\x01\x00i\x00\xdb\x00\x00\x00\x01\x00\x00\x00\xfa\xb5\xfa\x943\xb5\xfa\x943\x00P\x1e\xca\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x0fJ`\xac\x01\xab\x94\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x02(\xb5\xfa\x87[\xb5\xfa\x87[\x9a\xd6/\xab\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac*\x0f\x93\xac\x01\xb8\xa3\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x00(\xb5\xfa\x89\xbb\xb5\xfa\x89\xbbn\xe1\x00P\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x93\xa1\xac\x16\x80\x0c\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x00(\xb5\xfa\x87&\xb5\xfa\x87&\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\x83Z\xac\x1fR\xcd\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x90\r\xb5\xfa\x90\r\xf7*\x00\x8a\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x0c\xe0\xad\xac\x01\xa8V\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x9c\xf6\xb5\xfa\x9c\xf6\xe5|\x1a+\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x1e\xccT\xac<x&\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x80\xea\xb5\xfa\x80\xea\x00\x00\x00\x00\x00\x00/\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\xbb\x18\xac\x01|z\xc0\xa82\x16\x00i\x02q\x00\x00\x00\x01\x00\x00\x00\xfa\xb5\xfa\x88p\xb5\xfa\x88p\x00P\x0b}\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x17\x0er\xac\x01\x8f\xdd\xc0\xa822\x02q\x00i\x00\x00\x00\x01\x00\x00\x02(\xb5\xfa\x89\xf7\xb5\xfa\x89\xf7\r\xf7\x00\x8a\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\n\xbb\x04\xac<\xb0\x15\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa\x90\xa9\xb5\xfa\x90\xa9\x9c\xd0\x00\x8f\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\nz?\xac)\x03\xc8\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfaue\xb5\xfaue\xee\xa6\x00P\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac\x01\xb5\x05\xc0\xa8c\x9f\n\x00\x02\x01\x00i\x00\xdb\x00\x00\x00\x01\x00\x00\x05\xdc\xb5\xfa{\xc7\xb5\xfa{\xc7\x00P\x86\xa9\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00\xac2\xa5\x1b\xac)0\xbf\n\x00\x02\x01\x02q\x00\xdb\x00\x00\x00\x01\x00\x00\x00\xfa\xb5\xfa\x9bZ\xb5\xfa\x9bZC\xf9\x17\xe0\x00\x00\x06\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+ 
+         def testPack(self):
+             pass
+Index: dpkt/icmp6.py
+===================================================================
+--- dpkt/icmp6.py	(revision 82)
++++ dpkt/icmp6.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Internet Control Message Protocol for IPv6."""
+ 
+-import dpkt, ip6
++from . import dpkt, ip6
+ 
+ ICMP6_DST_UNREACH            = 1       # dest unreachable, codes:
+ ICMP6_PACKET_TOO_BIG         = 2       # packet too big
+Index: dpkt/yahoo.py
+===================================================================
+--- dpkt/yahoo.py	(revision 82)
++++ dpkt/yahoo.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Yahoo Messenger."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ class YHOO(dpkt.Packet):
+     __hdr__ = [
+Index: dpkt/smb.py
+===================================================================
+--- dpkt/smb.py	(revision 82)
++++ dpkt/smb.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Server Message Block."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ class SMB(dpkt.Packet):
+     __hdr__ = [
+Index: dpkt/arp.py
+===================================================================
+--- dpkt/arp.py	(revision 82)
++++ dpkt/arp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Address Resolution Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ # Hardware address format
+ ARP_HRD_ETH	= 0x0001	# ethernet hardware
+Index: dpkt/compat.py
+===================================================================
+--- dpkt/compat.py	(revision 0)
++++ dpkt/compat.py	(revision 0)
+@@ -0,0 +1,10 @@
++import sys
++
++PY3 = sys.version_info[0] == 3
++
++if PY3:
++    def compat_ord(c):
++        return c
++else:
++    def compat_ord(c):
++        return ord(c)
+Index: dpkt/dns.py
+===================================================================
+--- dpkt/dns.py	(revision 82)
++++ dpkt/dns.py	(working copy)
+@@ -3,7 +3,7 @@
+ """Domain Name System."""
+ 
+ import struct
+-import dpkt
++from . import dpkt, compat
+ 
+ DNS_Q = 0
+ DNS_R = 1
+@@ -57,13 +57,13 @@
+ 
+ def pack_name(name, off, label_ptrs):
+     if name:
+-        labels = name.split('.')
++        labels = name.split(b'.')
+     else:
+         labels = []
+-    labels.append('')
+-    buf = ''
++    labels.append(b'')
++    buf = b''
+     for i, label in enumerate(labels):
+-        key = '.'.join(labels[i:]).upper()
++        key = b'.'.join(labels[i:]).upper()
+         ptr = label_ptrs.get(key)
+         if not ptr:
+             if len(key) > 1:
+@@ -71,17 +71,17 @@
+                 if ptr < 0xc000:
+                     label_ptrs[key] = ptr
+             i = len(label)
+-            buf += chr(i) + label
++            buf += struct.pack("B",i) + label
+         else:
+             buf += struct.pack('>H', (0xc000 | ptr))
+             break
+     return buf
+ 
+ def unpack_name(buf, off):
+-    name = ''
++    name = b''
+     saved_off = 0
+     for i in range(100): # XXX
+-        n = ord(buf[off])
++        n = compat.compat_ord(buf[off])
+         if n == 0:
+             off += 1
+             break
+@@ -91,15 +91,15 @@
+             if not saved_off:
+                 saved_off = off
+             # XXX - don't use recursion!@#$
+-            name = name + unpack_name(buf, ptr)[0] + '.'
++            name = name + unpack_name(buf, ptr)[0] + b'.'
+             break
+         else:
+             off += 1
+-            name = name + buf[off:off+n] + '.'
++            name = name + buf[off:off+n] + b'.'
+             if len(name) > 255:
+                 raise dpkt.UnpackError('name longer than 255 bytes')
+             off += n
+-    return name.strip('.'), off
++    return name.strip(b'.'), off
+ 
+ class DNS(dpkt.Packet):
+     __hdr__ = (
+@@ -172,12 +172,12 @@
+                 l.append(pack_name(self.rname, off + len(l[0]), label_ptrs))
+                 l.append(struct.pack('>IIIII', self.serial, self.refresh,
+                                      self.retry, self.expire, self.minimum))
+-                return ''.join(l)
++                return b''.join(l)
+             elif self.type == DNS_MX:
+                 return struct.pack('>H', self.preference) + \
+                        pack_name(self.mxname, off + 2, label_ptrs)
+             elif self.type == DNS_TXT or self.type == DNS_HINFO:
+-                return ''.join([ '%s%s' % (chr(len(x)), x)
++                return b''.join([ '%s%s' % (chr(len(x)), x)
+                                  for x in self.text ])
+             elif self.type == DNS_AAAA:
+                 return self.ip6
+@@ -206,7 +206,7 @@
+                 self.text = []
+                 buf = self.rdata
+                 while buf:
+-                    n = ord(buf[0])
++                    n = compat.compat_ord(buf[0])
+                     self.text.append(buf[1:1+n])
+                     buf = buf[1+n:]
+             elif self.type == DNS_AAAA:
+@@ -261,13 +261,16 @@
+             for i in range(cnt):
+                 rr, off = self.unpack_rr(buf, off)
+                 getattr(self, x).append(rr)
+-        self.data = ''
++        self.data = b''
+ 
+     def __len__(self):
+         # XXX - cop out
+-        return len(str(self))
++        return len(bytes(self))
+ 
+     def __str__(self):
++        return str(self.__bytes__())
++
++    def __bytes__(self):
+         # XXX - compress names on the fly
+         self.label_ptrs = {}
+         buf = struct.pack(self.__hdr_fmt__, self.id, self.op, len(self.qd),
+@@ -282,32 +285,32 @@
+ 
+ if __name__ == '__main__':
+     import unittest
+-    from ip import IP
++    from .ip import IP
+ 
+     class DNSTestCase(unittest.TestCase):
+         def test_basic(self):
+-            s = 'E\x00\x02\x08\xc15\x00\x00\x80\x11\x92aBk0\x01Bk0w\x005\xc07\x01\xf4\xda\xc2d\xd2\x81\x80\x00\x01\x00\x03\x00\x0b\x00\x0b\x03www\x06google\x03com\x00\x00\x01\x00\x01\xc0\x0c\x00\x05\x00\x01\x00\x00\x03V\x00\x17\x03www\x06google\x06akadns\x03net\x00\xc0,\x00\x01\x00\x01\x00\x00\x01\xa3\x00\x04@\xe9\xabh\xc0,\x00\x01\x00\x01\x00\x00\x01\xa3\x00\x04@\xe9\xabc\xc07\x00\x02\x00\x01\x00\x00KG\x00\x0c\x04usw5\x04akam\xc0>\xc07\x00\x02\x00\x01\x00\x00KG\x00\x07\x04usw6\xc0t\xc07\x00\x02\x00\x01\x00\x00KG\x00\x07\x04usw7\xc0t\xc07\x00\x02\x00\x01\x00\x00KG\x00\x08\x05asia3\xc0t\xc07\x00\x02\x00\x01\x00\x00KG\x00\x05\x02za\xc07\xc07\x00\x02\x00\x01\x00\x00KG\x00\x0f\x02zc\x06akadns\x03org\x00\xc07\x00\x02\x00\x01\x00\x00KG\x00\x05\x02zf\xc07\xc07\x00\x02\x00\x01\x00\x00KG\x00\x05\x02zh\xc0\xd5\xc07\x00\x02\x00\x01\x00\x00KG\x00\x07\x04eur3\xc0t\xc07\x00\x02\x00\x01\x00\x00KG\x00\x07\x04use2\xc0t\xc07\x00\x02\x00\x01\x00\x00KG\x00\x07\x04use4\xc0t\xc0\xc1\x00\x01\x00\x01\x00\x00\xfb4\x00\x04\xd0\xb9\x84\xb0\xc0\xd2\x00\x01\x00\x01\x00\x001\x0c\x00\x04?\xf1\xc76\xc0\xed\x00\x01\x00\x01\x00\x00\xfb4\x00\x04?\xd7\xc6S\xc0\xfe\x00\x01\x00\x01\x00\x001\x0c\x00\x04?\xd00.\xc1\x0f\x00\x01\x00\x01\x00\x00\n\xdf\x00\x04\xc1-\x01g\xc1"\x00\x01\x00\x01\x00\x00\x101\x00\x04?\xd1\xaa\x88\xc15\x00\x01\x00\x01\x00\x00\r\x1a\x00\x04PCC\xb6\xc0o\x00\x01\x00\x01\x00\x00\x10\x7f\x00\x04?\xf1I\xd6\xc0\x87\x00\x01\x00\x01\x00\x00\n\xdf\x00\x04\xce\x84dl\xc0\x9a\x00\x01\x00\x01\x00\x00\n\xdf\x00\x04A\xcb\xea\x1b\xc0\xad\x00\x01\x00\x01\x00\x00\x0b)\x00\x04\xc1l\x9a\t'
++            s = b'E\x00\x02\x08\xc15\x00\x00\x80\x11\x92aBk0\x01Bk0w\x005\xc07\x01\xf4\xda\xc2d\xd2\x81\x80\x00\x01\x00\x03\x00\x0b\x00\x0b\x03www\x06google\x03com\x00\x00\x01\x00\x01\xc0\x0c\x00\x05\x00\x01\x00\x00\x03V\x00\x17\x03www\x06google\x06akadns\x03net\x00\xc0,\x00\x01\x00\x01\x00\x00\x01\xa3\x00\x04@\xe9\xabh\xc0,\x00\x01\x00\x01\x00\x00\x01\xa3\x00\x04@\xe9\xabc\xc07\x00\x02\x00\x01\x00\x00KG\x00\x0c\x04usw5\x04akam\xc0>\xc07\x00\x02\x00\x01\x00\x00KG\x00\x07\x04usw6\xc0t\xc07\x00\x02\x00\x01\x00\x00KG\x00\x07\x04usw7\xc0t\xc07\x00\x02\x00\x01\x00\x00KG\x00\x08\x05asia3\xc0t\xc07\x00\x02\x00\x01\x00\x00KG\x00\x05\x02za\xc07\xc07\x00\x02\x00\x01\x00\x00KG\x00\x0f\x02zc\x06akadns\x03org\x00\xc07\x00\x02\x00\x01\x00\x00KG\x00\x05\x02zf\xc07\xc07\x00\x02\x00\x01\x00\x00KG\x00\x05\x02zh\xc0\xd5\xc07\x00\x02\x00\x01\x00\x00KG\x00\x07\x04eur3\xc0t\xc07\x00\x02\x00\x01\x00\x00KG\x00\x07\x04use2\xc0t\xc07\x00\x02\x00\x01\x00\x00KG\x00\x07\x04use4\xc0t\xc0\xc1\x00\x01\x00\x01\x00\x00\xfb4\x00\x04\xd0\xb9\x84\xb0\xc0\xd2\x00\x01\x00\x01\x00\x001\x0c\x00\x04?\xf1\xc76\xc0\xed\x00\x01\x00\x01\x00\x00\xfb4\x00\x04?\xd7\xc6S\xc0\xfe\x00\x01\x00\x01\x00\x001\x0c\x00\x04?\xd00.\xc1\x0f\x00\x01\x00\x01\x00\x00\n\xdf\x00\x04\xc1-\x01g\xc1"\x00\x01\x00\x01\x00\x00\x101\x00\x04?\xd1\xaa\x88\xc15\x00\x01\x00\x01\x00\x00\r\x1a\x00\x04PCC\xb6\xc0o\x00\x01\x00\x01\x00\x00\x10\x7f\x00\x04?\xf1I\xd6\xc0\x87\x00\x01\x00\x01\x00\x00\n\xdf\x00\x04\xce\x84dl\xc0\x9a\x00\x01\x00\x01\x00\x00\n\xdf\x00\x04A\xcb\xea\x1b\xc0\xad\x00\x01\x00\x01\x00\x00\x0b)\x00\x04\xc1l\x9a\t'
+             ip = IP(s)
+             dns = DNS(ip.udp.data)
+-            self.failUnless(dns.qd[0].name == 'www.google.com' and
+-                            dns.an[1].name == 'www.google.akadns.net')
+-            s = '\x05\xf5\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x03www\x03cnn\x03com\x00\x00\x01\x00\x01'
++            self.assertTrue(dns.qd[0].name == b'www.google.com' and
++                            dns.an[1].name == b'www.google.akadns.net')
++            s = b'\x05\xf5\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x03www\x03cnn\x03com\x00\x00\x01\x00\x01'
+             dns = DNS(s)
+-            self.failUnless(s == str(dns))
++            self.assertTrue(s == bytes(dns))
+ 
+         def test_PTR(self):
+-            s = 'g\x02\x81\x80\x00\x01\x00\x01\x00\x03\x00\x00\x011\x011\x03211\x03141\x07in-addr\x04arpa\x00\x00\x0c\x00\x01\xc0\x0c\x00\x0c\x00\x01\x00\x00\r6\x00$\x07default\nv-umce-ifs\x05umnet\x05umich\x03edu\x00\xc0\x0e\x00\x02\x00\x01\x00\x00\r6\x00\r\x06shabby\x03ifs\xc0O\xc0\x0e\x00\x02\x00\x01\x00\x00\r6\x00\x0f\x0cfish-license\xc0m\xc0\x0e\x00\x02\x00\x01\x00\x00\r6\x00\x0b\x04dns2\x03itd\xc0O'
++            s = b'g\x02\x81\x80\x00\x01\x00\x01\x00\x03\x00\x00\x011\x011\x03211\x03141\x07in-addr\x04arpa\x00\x00\x0c\x00\x01\xc0\x0c\x00\x0c\x00\x01\x00\x00\r6\x00$\x07default\nv-umce-ifs\x05umnet\x05umich\x03edu\x00\xc0\x0e\x00\x02\x00\x01\x00\x00\r6\x00\r\x06shabby\x03ifs\xc0O\xc0\x0e\x00\x02\x00\x01\x00\x00\r6\x00\x0f\x0cfish-license\xc0m\xc0\x0e\x00\x02\x00\x01\x00\x00\r6\x00\x0b\x04dns2\x03itd\xc0O'
+             dns = DNS(s)
+-            self.failUnless(dns.qd[0].name == '1.1.211.141.in-addr.arpa' and
+-                            dns.an[0].ptrname == 'default.v-umce-ifs.umnet.umich.edu' and
+-                            dns.ns[0].nsname == 'shabby.ifs.umich.edu' and
+-                            dns.ns[1].ttl == 3382L and
+-                            dns.ns[2].nsname == 'dns2.itd.umich.edu')
+-            self.failUnless(s == str(dns))
++            self.assertTrue(dns.qd[0].name == b'1.1.211.141.in-addr.arpa' and
++                            dns.an[0].ptrname == b'default.v-umce-ifs.umnet.umich.edu' and
++                            dns.ns[0].nsname == b'shabby.ifs.umich.edu' and
++                            dns.ns[1].ttl == 3382 and
++                            dns.ns[2].nsname == b'dns2.itd.umich.edu')
++            self.assertTrue(s == bytes(dns))
+     
+         def test_pack_name(self):
+             # Empty name is \0
+-            x = pack_name('', 0, {})
+-            self.assertEqual(x, '\0')
++            x = pack_name(b'', 0, {})
++            self.assertEqual(x, b'\0')
+ 
+     unittest.main()
+Index: dpkt/esp.py
+===================================================================
+--- dpkt/esp.py	(revision 82)
++++ dpkt/esp.py	(working copy)
+@@ -2,7 +2,7 @@
+ 
+ """Encapsulated Security Protocol."""
+ 
+-import dpkt
++from . import dpkt
+ 
+ class ESP(dpkt.Packet):
+     __hdr__ = (
+Index: tests/test-perf.py
+===================================================================
+--- tests/test-perf.py	(revision 82)
++++ tests/test-perf.py	(working copy)
+@@ -44,27 +44,27 @@
+     data = 'hello world'
+ 
+     start = time.time()
+-    for i in xrange(cnt):
++    for i in range(cnt):
+         dnet.ip_checksum(
+             str(dpkt.ip.IP(src=src, dst=dst, p=dnet.IP_PROTO_UDP,
+                          len = dnet.IP_HDR_LEN + dnet.UDP_HDR_LEN + len(data),
+                          data=dpkt.udp.UDP(sport=111, dport=222,
+                                        ulen=dnet.UDP_HDR_LEN + len(data),
+                                        data=data))))
+-    print 'dpkt:', cnt / (time.time() - start), 'pps'
++    print('dpkt:', cnt / (time.time() - start), 'pps')
+     
+     start = time.time()
+-    for i in xrange(cnt):
++    for i in range(cnt):
+         dnet.ip_checksum(str(dpkt.ip.IP(src=src, dst=dst, p=dnet.IP_PROTO_UDP,
+                                      len=dnet.IP_HDR_LEN + dnet.UDP_HDR_LEN +
+                                      len(data))) +
+                          str(dpkt.udp.UDP(sport=111, dport=222,
+                                       ulen=dnet.UDP_HDR_LEN + len(data))) +
+                          data)
+-    print 'dpkt (manual):', cnt / (time.time() - start), 'pps'
++    print('dpkt (manual):', cnt / (time.time() - start), 'pps')
+     
+     start = time.time()
+-    for i in xrange(cnt):
++    for i in range(cnt):
+         ip = ImpactPacket.IP()
+         ip.set_ip_src('1.2.3.4')
+         ip.set_ip_dst('5.6.7.8')
+@@ -74,10 +74,10 @@
+         udp.contains(ImpactPacket.Data(data))
+         ip.contains(udp)
+         ip.get_packet()
+-    print 'impacket:', cnt / (time.time() - start), 'pps'
++    print('impacket:', cnt / (time.time() - start), 'pps')
+ 
+     start = time.time()
+-    for i in xrange(cnt):
++    for i in range(cnt):
+         p = packet.createPacket(packet.IP, packet.UDP)
+         p['ip'].src = '1.2.3.4'
+         p['ip'].dst = '5.6.7.8'
+@@ -86,17 +86,17 @@
+         p['udp'].payload = data
+         p.finalise()
+         p.getRaw()
+-    print 'openbsd.packet:', cnt / (time.time() - start), 'pps'
++    print('openbsd.packet:', cnt / (time.time() - start), 'pps')
+     
+     start = time.time()
+-    for i in xrange(cnt):
++    for i in range(cnt):
+         ip = scapy.IP(src='1.2.3.4', dst='5.6.7.8') / \
+              scapy.UDP(sport=111, dport=222) / data
+         ip.build()
+-    print 'scapy:', cnt / (time.time() - start), 'pps'
++    print('scapy:', cnt / (time.time() - start), 'pps')
+     
+     start = time.time()
+-    for i in xrange(cnt):
++    for i in range(cnt):
+         udp = xudp()
+         udp.sport = 111
+         udp.dport = 222
+@@ -107,7 +107,7 @@
+         ip.p = dnet.IP_PROTO_UDP
+         ip.len = dnet.IP_HDR_LEN + udp.ulen
+         dnet.ip_checksum(str(ip) + str(udp) + data)
+-    print 'xstruct:', cnt / (time.time() - start), 'pps'
++    print('xstruct:', cnt / (time.time() - start), 'pps')
+     
+ def compare_parse(cnt):
+     """
+@@ -120,44 +120,44 @@
+     s = 'E\x00\x00T\xc2\xf3\x00\x00\xff\x01\xe2\x18\n\x00\x01\x92\n\x00\x01\x0b\x08\x00\xfc\x11:g\x00\x00A,\xc66\x00\x0e\xcf\x12\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f!"#$%&\'()*+,-./01234567'
+ 
+     start = time.time()
+-    for i in xrange(cnt):
++    for i in range(cnt):
+         dpkt.ip.IP(s)
+-    print 'dpkt:', cnt / (time.time() - start), 'pps'
++    print('dpkt:', cnt / (time.time() - start), 'pps')
+     
+     decoder = ImpactDecoder.IPDecoder()
+     start = time.time()
+-    for i in xrange(cnt):
++    for i in range(cnt):
+         decoder.decode(s)
+-    print 'impacket:', cnt / (time.time() - start), 'pps'
++    print('impacket:', cnt / (time.time() - start), 'pps')
+ 
+     start = time.time()
+-    for i in xrange(cnt):
++    for i in range(cnt):
+         packet.Packet(packet.IP, s)
+-    print 'openbsd.packet:', cnt / (time.time() - start), 'pps'
++    print('openbsd.packet:', cnt / (time.time() - start), 'pps')
+ 
+     start = time.time()
+-    for i in xrange(cnt):
++    for i in range(cnt):
+         scapy.IP(s)
+-    print 'scapy:', cnt / (time.time() - start), 'pps'
++    print('scapy:', cnt / (time.time() - start), 'pps')
+ 
+     start = time.time()
+-    for i in xrange(cnt):
++    for i in range(cnt):
+         ip = xip(s[:dnet.IP_HDR_LEN])
+         udp = xudp(s[dnet.IP_HDR_LEN:dnet.IP_HDR_LEN + dnet.UDP_HDR_LEN])
+         data = s[dnet.IP_HDR_LEN + dnet.UDP_HDR_LEN:]
+-    print 'xstruct:', cnt / (time.time() - start), 'pps'
++    print('xstruct:', cnt / (time.time() - start), 'pps')
+ 
+ def compare_checksum(cnt):
+     s = 'A' * 80
+     start = time.time()
+     for i in range(cnt):
+         dpkt.in_cksum(s)
+-    print 'dpkt.in_cksum:', cnt / (time.time() - start), 'pps'
++    print('dpkt.in_cksum:', cnt / (time.time() - start), 'pps')
+     
+     start = time.time()
+     for i in range(cnt):
+         dnet.ip_cksum_carry(dnet.ip_cksum_add(s, 0))
+-    print 'dnet.ip_cksum_add/carry:', cnt / (time.time() - start), 'pps'
++    print('dnet.ip_cksum_add/carry:', cnt / (time.time() - start), 'pps')
+ 
+ def main():
+     import psyco
+@@ -165,13 +165,13 @@
+ 
+     ITER=10000
+     
+-    print 'checksum:'
++    print('checksum:')
+     compare_checksum(100000)
+ 
+-    print 'create:'
++    print('create:')
+     compare_create(ITER)
+ 
+-    print 'parse:'
++    print('parse:')
+     compare_parse(ITER)
+     
+ if __name__ == '__main__':
+Index: tests/test-perf2.py
+===================================================================
+--- tests/test-perf2.py	(revision 82)
++++ tests/test-perf2.py	(working copy)
+@@ -9,18 +9,18 @@
+     def setUp(self):
+         self.start = time.time()
+     def tearDown(self):
+-        print self.rounds / (time.time() - self.start), 'rounds/s'
++        print(self.rounds / (time.time() - self.start), 'rounds/s')
+ 
+     def test_pack(self):
+-        for i in xrange(self.rounds):
++        for i in range(self.rounds):
+             str(dpkt.ip.IP())
+-        print 'pack:',
++        print('pack:', end=' ')
+ 
+     def test_unpack(self):
+         buf = str(dpkt.ip.IP())
+-        for i in xrange(self.rounds):
++        for i in range(self.rounds):
+             dpkt.ip.IP(buf)
+-        print 'unpack:',
++        print('unpack:', end=' ')
+         
+ if __name__ == '__main__':
+     unittest.main()
+Index: examples/ping.py
+===================================================================
+--- examples/ping.py	(revision 82)
++++ examples/ping.py	(working copy)
+@@ -7,7 +7,7 @@
+     def __init__(self):
+         usage = '%prog [OPTIONS] <host>'
+         self.op = optparse.OptionParser(usage=usage)
+-        self.op.add_option('-c', dest='count', type='int', default=sys.maxint,
++        self.op.add_option('-c', dest='count', type='int', default=sys.maxsize,
+                            help='Total number of queries to send')
+         self.op.add_option('-i', dest='wait', type='float', default=1,
+                            help='Specify packet interval timeout in seconds')
+@@ -60,14 +60,14 @@
+         except KeyboardInterrupt:
+             pass
+ 
+-        print '\n--- %s ping statistics ---' % opts.ip
+-        print '%d packets transmitted, %d packets received, %.1f%% packet loss' % \
+-              (sent, rcvd, (float(sent - rcvd) / sent) * 100)
++        print('\n--- %s ping statistics ---' % opts.ip)
++        print('%d packets transmitted, %d packets received, %.1f%% packet loss' % \
++              (sent, rcvd, (float(sent - rcvd) / sent) * 100))
+         rtt_avg = rtt_sum / sent
+         if rtt_min == 0xffff: rtt_min = 0
+-        print 'round-trip min/avg/max/std-dev = %.3f/%.3f/%.3f/%.3f ms' % \
++        print('round-trip min/avg/max/std-dev = %.3f/%.3f/%.3f/%.3f ms' % \
+               (rtt_min * 1000, rtt_avg * 1000, rtt_max * 1000,
+-               math.sqrt((rtt_sumsq / sent) - (rtt_avg * rtt_avg)) * 1000)
++               math.sqrt((rtt_sumsq / sent) - (rtt_avg * rtt_avg)) * 1000))
+ 
+ class ICMPPing(Ping):
+     def __init__(self):
+@@ -83,14 +83,14 @@
+         return sock
+     
+     def gen_ping(self, opts):
+-        for i in xrange(opts.count):
++        for i in range(opts.count):
+             icmp = dpkt.icmp.ICMP(
+                 type=8, data=dpkt.icmp.ICMP.Echo(id=random.randint(0, 0xffff),
+                                                  seq=i, data=opts.payload))
+             yield str(icmp)
+ 
+     def print_header(self, opts):
+-        print 'PING %s: %d data bytes' % (opts.ip, len(opts.payload))
++        print('PING %s: %d data bytes' % (opts.ip, len(opts.payload)))
+         
+     def print_reply(self, opts, buf, rtt):
+         ip = dpkt.ip.IP(buf)
+@@ -98,9 +98,9 @@
+             # XXX - work around raw socket bug on MacOS X
+             ip.data = ip.icmp = dpkt.icmp.ICMP(buf[20:])
+             ip.len = len(ip.data)
+-        print '%d bytes from %s: icmp_seq=%d ip_id=%d ttl=%d time=%.3f ms' % \
++        print('%d bytes from %s: icmp_seq=%d ip_id=%d ttl=%d time=%.3f ms' % \
+               (len(ip.icmp), opts.ip, ip.icmp.echo.seq, ip.id, ip.ttl,
+-               rtt * 1000)
++               rtt * 1000))
+ 
+ if __name__ == '__main__':
+     p = ICMPPing()
+Index: examples/nbtping.py
+===================================================================
+--- examples/nbtping.py	(revision 82)
++++ examples/nbtping.py	(working copy)
+@@ -17,13 +17,13 @@
+         return sock
+     
+     def gen_ping(self, opts):
+-        for i in xrange(opts.count):
++        for i in range(opts.count):
+             ns = netbios.NS(id=i,
+                 qd=[ netbios.NS.Q(type=netbios.NS_NBSTAT, name='*') ])
+             yield str(ns)
+ 
+     def print_header(self, opts):
+-        print 'NBTPING %s:' % opts.ip
++        print('NBTPING %s:' % opts.ip)
+         
+     def print_reply(self, opts, buf, rtt):
+         ns = netbios.NS(buf)
+@@ -36,9 +36,9 @@
+                 elif svc == 0x03 and unique:
+                     if 'user' not in d or d['user'].startswith(d['host']):
+                         d['user'] = name
+-        print '%d bytes from %s: id=%d time=%.3f ms host=%s user=%s' % \
++        print('%d bytes from %s: id=%d time=%.3f ms host=%s user=%s' % \
+               (len(buf), opts.ip, ns.id, rtt * 1000,
+-               d.get('host', ''), d.get('user', ''))
++               d.get('host', ''), d.get('user', '')))
+ 
+ if __name__ == '__main__':
+     NBTPing().main()
+Index: examples/dnsping.py
+===================================================================
+--- examples/dnsping.py	(revision 82)
++++ examples/dnsping.py	(working copy)
+@@ -24,7 +24,7 @@
+         return sock
+ 
+     def gen_ping(self, opts):
+-        for i in xrange(opts.count):
++        for i in range(opts.count):
+             dns = dpkt.dns.DNS(id=i)
+             if opts.norecurse:
+                 dns.op &= ~dpkt.dns.DNS_RD
+@@ -36,16 +36,16 @@
+             yield str(dns)
+ 
+     def print_header(self, opts):
+-        print 'DNSPING %s:' % opts.ip,
++        print('DNSPING %s:' % opts.ip, end=' ')
+         if opts.hostname:
+-            print 'Name: %s' % opts.hostname
++            print('Name: %s' % opts.hostname)
+         else:
+-            print 'Name: *.%s' % opts.zone
++            print('Name: *.%s' % opts.zone)
+         
+     def print_reply(self, opts, buf, rtt):
+         dns = dpkt.dns.DNS(buf)
+-        print '%d bytes from %s: id=%d time=%.3f ms' % \
+-              (len(buf), opts.ip, dns.id, rtt * 1000)
++        print('%d bytes from %s: id=%d time=%.3f ms' % \
++              (len(buf), opts.ip, dns.id, rtt * 1000))
+ 
+ if __name__ == '__main__':
+     DNSPing().main()

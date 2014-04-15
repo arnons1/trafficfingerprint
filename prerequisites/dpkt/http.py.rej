@@ -1,0 +1,19 @@
+***************
+*** 3,10 ****
+  """Hypertext Transfer Protocol."""
+  
+- import cStringIO
+- import dpkt
+  
+  def parse_headers(f):
+      """Return dict of HTTP headers parsed from a file object."""
+      d = {}
+--- 3,10 ----
+  """Hypertext Transfer Protocol."""
++ from . import dpkt
++ import io, struct
+  
+  
+  def parse_headers(f):
+      """Return dict of HTTP headers parsed from a file object."""
+      d = {}
