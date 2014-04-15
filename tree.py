@@ -6,6 +6,11 @@ import difflib # Finding closest strings
 from nt import getcwd # Get current working directory
 from scipy.cluster.vq import kmeans, whiten # Kmeans clustering
 import tkinter # UI
+import numpy as np
+from matplotlib.transforms import offset_copy
+import matplotlib.pyplot as pl
+import pylab
+
 
 hashmap = {}
 observed_vector = []
@@ -492,16 +497,46 @@ def training(dir_list = ['training_1']):
 		decision_boundaries.append((value + last_value) / 2) # Boundary is between two centroids in the codebook
 		last_value = value 
 
+def showQuantizations():
+	X = range(len(codebook))
+	labels = [ chr(97+val) for val in X ]
+	font = {'family' : 'serif',
+        'color'  : 'darkred',
+        'weight' : 'normal',
+        'size'   : 16,
+    }
+	fig = pl.figure()
+	ax = fig.add_subplot(111)
+	pl.title('Codebook quantization values', fontdict=font)
+	
+	transOffset = offset_copy(ax.transData, fig=fig, x = 0.08, y=-0.20, units='inches')
+	for x, y in zip(X, codebook):
+		pl.plot((x,),(y,), 'ro')
+		pl.text(x, y, ('%2.4f' % y), transform=transOffset)
+	
+	# You can specify a rotation for the tick labels in degrees or with keywords.
+	pl.xlabel('Quantized value')
+	pl.xticks(X, labels)
+	# Pad margins so that markers don't get clipped by the axes
+	pylab.ylabel('Time [Sec]')
+	pl.margins(0.2)
+	# Tweak spacing to prevent clipping of tick-labels
+	pl.subplots_adjust(bottom=0.15)
+	pl.show()
+
 def trainingCallback():
 	if len(lb.curselection())<1:
 		statusString.set("You haven't picked any directories")
 		return
+	codebook.clear()
+	hashmap.clear()
 	items = map(int,lb.curselection())	
 	l = []
 	for i in items:
 		l.append(list_of_dirs[i]) #.replace('/','\\'))
 	training(l)
 	statusString.set("Done training!")
+	tkinter.Button(tkwindow, text="Show quantizations", command=showQuantizations).pack()
 
 if __name__ == "__main__":
 	tkwindow.title("Traffic Fingerprinting")
