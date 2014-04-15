@@ -14,7 +14,8 @@ codebook = []
 decision_boundaries = []
 list_of_dirs = []
 tkwindow = tkinter.Tk() # Start up TK
-lb = tkinter.Listbox(tkwindow, height=10, width=300, selectmode=tkinter.MULTIPLE)
+statusString = tkinter.StringVar()
+lb = tkinter.Listbox(tkwindow, height=6, width=200, selectmode=tkinter.MULTIPLE)
 	
 def generateTreeFromString(string):
 	hashmap.clear()
@@ -99,29 +100,29 @@ class edgeprob:
 # buildTree builds a tree given a sorted list of items (from the hashmap usually)
 #===============================================================================
 def buildTree(listToInsert):
-	tkwindow = node('tkwindow', 0, [])  # Create new tkwindow item with probability 0
-	[ insertToTree(tkwindow, item) for item in listToInsert ]  # Insert items one by one
-	return tkwindow
+	root = node('root', 0, [])  # Create new root item with probability 0
+	[ insertToTree(root, item) for item in listToInsert ]  # Insert items one by one
+	return root
 		
-def insertToTree(tkwindow, tag):
+def insertToTree(root, tag):
 	newitem = (node(tag, 0.0, []), edgeprob(0.0))  # New tuple (Node,Probability of edge)
 	son = 0  # For preventing the last "if" clause
 	
-	if isLeaf(tkwindow) == True:  # Empty subtree - first tag being inserted
-		tkwindow.sub_tree.append(newitem)  # Place in the node's children
-		tkwindow.sub_tree_size = 1
-		tkwindow.sub_tree.sort(key=lambda sub_tree_item: sub_tree_item[0].name)
+	if isLeaf(root) == True:  # Empty subtree - first tag being inserted
+		root.sub_tree.append(newitem)  # Place in the node's children
+		root.sub_tree_size = 1
+		root.sub_tree.sort(key=lambda sub_tree_item: sub_tree_item[0].name)
 		
 	else:  # The subtree isn't empty
-		son = findAppSon(tkwindow.sub_tree, tag)  # Find if there exists a child with the correct tag
-		if son != -1:  # It exists, so call this method with that child as the tkwindow
-			tkwindow.sub_tree_size += 1
+		son = findAppSon(root.sub_tree, tag)  # Find if there exists a child with the correct tag
+		if son != -1:  # It exists, so call this method with that child as the root
+			root.sub_tree_size += 1
 			insertToTree(son[0], tag)
 			
-	if isLeaf(tkwindow) == False and son == -1:  # No child was found and the tkwindow isn't a leaf, so add it to the tkwindow.
-		tkwindow.sub_tree.append(newitem)
-		tkwindow.sub_tree_size += 1
-		tkwindow.sub_tree.sort(key=lambda sub_tree_item: sub_tree_item[0].name)
+	if isLeaf(root) == False and son == -1:  # No child was found and the root isn't a leaf, so add it to the root.
+		root.sub_tree.append(newitem)
+		root.sub_tree_size += 1
+		root.sub_tree.sort(key=lambda sub_tree_item: sub_tree_item[0].name)
 	
 #===============================================================================
 # findAppSon checks if it can find a son with a specific tag. 
@@ -143,10 +144,10 @@ def isLeaf(node):
 		return False
 
 #===============================================================================
-# countLeavesTree counts leaves in a tree, given its tkwindow.
+# countLeavesTree counts leaves in a tree, given its root.
 #===============================================================================
-def countLeavesTree(tkwindow):
-	l = [ countLeaves(son) for son in tkwindow.sub_tree ]
+def countLeavesTree(root):
+	l = [ countLeaves(son) for son in root.sub_tree ]
 	return sum(l)
 
 #===============================================================================
@@ -162,9 +163,9 @@ def countLeaves(node_tuple):
 #===============================================================================
 #
 #===============================================================================
-def findLeavesTree(tkwindow):
+def findLeavesTree(root):
 
-	l = [ findLeaves(son) for son in tkwindow.sub_tree ]
+	l = [ findLeaves(son) for son in root.sub_tree ]
 	return l
 
 #===============================================================================
@@ -179,9 +180,9 @@ def findLeaves(node_tuple):
 #===============================================================================
 #
 #===============================================================================
-def findMaxDepthTree(tkwindow):
+def findMaxDepthTree(root):
 
-	l = [ findMaxDepthLeaves(son) for son in tkwindow.sub_tree ]
+	l = [ findMaxDepthLeaves(son) for son in root.sub_tree ]
 	return max(l)
 
 #===============================================================================
@@ -195,15 +196,15 @@ def findMaxDepthLeaves(node_tuple):
 	
 #===============================================================================
 # setProbTree sets probabilities for the nodes (full probability for event)
-# Accepts a tree tkwindow and the number of leaves (this is for uniform probability for the leaves)
+# Accepts a tree root and the number of leaves (this is for uniform probability for the leaves)
 #===============================================================================
-def setProbTree(tkwindow, num_leaves):
-	l = [ setProbLeaves(son, num_leaves) for son in tkwindow.sub_tree ]
-	tkwindow.prob = sum(l)
+def setProbTree(root, num_leaves):
+	l = [ setProbLeaves(son, num_leaves) for son in root.sub_tree ]
+	root.prob = sum(l)
 	return sum(l)
 
 #===============================================================================
-# setProbLeaves sets probabilities for the rest of the nodes that aren't the tkwindow
+# setProbLeaves sets probabilities for the rest of the nodes that aren't the root
 #===============================================================================
 def setProbLeaves(node_tuple, num_leaves):
 	if isLeaf(node_tuple[0]) == True:
@@ -216,16 +217,16 @@ def setProbLeaves(node_tuple, num_leaves):
 	
 
 #===============================================================================
-# setProbEdgesTree Sets probabilities for the conditional probabilities (edges) for the tkwindow
+# setProbEdgesTree Sets probabilities for the conditional probabilities (edges) for the root
 #===============================================================================
-def setProbEdgesTree(tkwindow):
-	for son in tkwindow.sub_tree:
+def setProbEdgesTree(root):
+	for son in root.sub_tree:
 		son[1].prob = son[0].prob  # For every son of the ROOT ONLY, set probability of edge to probability of son
 		setProbEdgesLeaves(son)  # Then start setting probabilities for all sons, from the top down
 	return sum
 
 #===============================================================================
-# setProbEdgesLeaves Sets probabilities for the conditional probabilities (edges) for the non-tkwindow
+# setProbEdgesLeaves Sets probabilities for the conditional probabilities (edges) for the non-root
 #===============================================================================
 def setProbEdgesLeaves(node_tuple):
 	if isLeaf(node_tuple[0]) == True:
@@ -242,21 +243,21 @@ def setProbEdgesLeaves(node_tuple):
 #===============================================================================
 # printTreeForWolfram prints a tree nicely for WolframMathematica to display
 #===============================================================================
-def printTreeForWolfram(tkwindow, name, start=True, f=None):
+def printTreeForWolfram(root, name, start=True, f=None):
 	c = ','  # The c variable is used to prevent adding of extra commas when not necessary
 	if(start == True):
 		f = open(name + '.nb', 'w')
 		s = "g={"
 		f.write(s)
 		c = ''
-	for son in tkwindow.sub_tree:
-		s = c + "{\"%s | %d | %f\" -> \"%s | %d | %f\" , \"%f\" }" % (tkwindow.name, tkwindow.sub_tree_size, tkwindow.prob, son[0].name, son[0].sub_tree_size, son[0].prob, son[1].prob)
+	for son in root.sub_tree:
+		s = c + "{\"%s | %d | %f\" -> \"%s | %d | %f\" , \"%f\" }" % (root.name, root.sub_tree_size, root.prob, son[0].name, son[0].sub_tree_size, son[0].prob, son[1].prob)
 		f.write(s)
 		if c == '':
 			c = ','
 		printTreeForWolfram(son[0], name, False, f)
 	if(start == True):
-		s = "};\nTreePlot[g, Automatic, \"tkwindow | %d | %f\", VertexLabeling -> True]" % (tkwindow.sub_tree_size, tkwindow.prob)
+		s = "};\nTreePlot[g, Automatic, \"root | %d | %f\", VertexLabeling -> True]" % (root.sub_tree_size, root.prob)
 		f.write(s)
 		f.close()
 		call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", os.getcwd() + "/" + name + ".nb"])
@@ -267,9 +268,9 @@ def printTreeForWolfram(tkwindow, name, start=True, f=None):
 # be stored in the global variable 'file_list'
 #===============================================================================
 def findAllPcapFiles(wd):
-	for file in os.listdir(getcwd()+"/"+wd+"/"):
+	for file in os.listdir(os.path.join(getcwd(),wd)):
 		if file.endswith(".pcap"):
-			file_list.append(file)
+			file_list.append(os.path.join(getcwd(),wd,file))
 		
 #===============================================================================
 # collectAllRelativeTimestamps calls collectRelativeTimestampsForSingleFile for
@@ -284,7 +285,7 @@ def collectAllRelativeTimestamps(wd):
 # Saved in global variable observed_vector
 #===============================================================================
 def collectRelativeTimestampsForSingleFile(file,wd):
-	f = open(getcwd() + "/"+wd+"/" + file, "rb") # Open file
+	f = open(file, "rb") # Open file
 	pcapReader = dpkt.pcap.Reader(f) # Parse
 	frame_counter = 0
 	last_time = 0
@@ -325,7 +326,7 @@ def getCodeFromCodebook(value):
 # a string, that should be inserted into a tree later
 #===============================================================================
 def parsePcapAndGetQuantizedString(file,wd,max_len=0):
-	f = open(getcwd() + "/"+wd+"/" + file, "rb")
+	f = open(os.path.join(getcwd(),wd,file), "rb")
 	pcapReader = dpkt.pcap.Reader(f)
 	frame_counter = 0
 	last_time = 0
@@ -492,24 +493,38 @@ def training(dir_list = ['training_1']):
 		last_value = value 
 
 def trainingCallback():
-	items = map(int,lb.curselection())
+	if len(lb.curselection())<1:
+		statusString.set("You haven't picked any directories")
+		return
+	items = map(int,lb.curselection())	
 	l = []
 	for i in items:
-		l.append(list_of_dirs[i])
+		l.append(list_of_dirs[i]) #.replace('/','\\'))
 	training(l)
+	statusString.set("Done training!")
 
 if __name__ == "__main__":
 	tkwindow.title("Traffic Fingerprinting")
 	tkwindow.geometry("640x480")
 	tkwindow.wm_iconbitmap('fingerprint.ico')
-	
+	tkinter.Label(tkwindow,text="Pick directories to perform training on from below: ").pack()
 	i=0
+	scrollbar = tkinter.Scrollbar(tkwindow)
+	scrollbar.pack(side=tkinter.RIGHT, fill=tkinter.Y)
+	lb.config(yscrollcommand=scrollbar.set)
+	
 	for x in os.walk('.'):
-		list_of_dirs.append(x[0])
-		lb.insert(i,x[0])
-		i+=1
+		if not "git" in x[0] and x[0] != ".":
+			list_of_dirs.append(x[0][2:])
+			lb.insert(i,x[0][2:])
+			i+=1
 	lb.pack()
-	tkinter.Button(tkwindow, text="Training", command=trainingCallback).pack()
+	scrollbar.config(command=lb.yview)
+	
+	
+	tkinter.Button(tkwindow, text="Start Training", command=trainingCallback).pack()
+	tkinter.Label(tkwindow,textvariable=statusString,font=("Arial", 16),fg="#000080").pack()
+	statusString.set("Ready...")
 	tkinter.mainloop()
 
 	#t = []
