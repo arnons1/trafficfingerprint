@@ -6,11 +6,12 @@ import difflib # Finding closest strings
 from nt import getcwd # Get current working directory
 from scipy.cluster.vq import kmeans, whiten # Kmeans clustering
 import tkinter # UI
-import numpy as np
-from matplotlib.transforms import offset_copy
-import matplotlib.pyplot as pl
-import pylab
-
+import numpy as np # Number methods (average, median, stdev,...
+from matplotlib.transforms import offset_copy # Graphs
+import matplotlib.pyplot as pl # Graphs
+import pylab # Graphs
+import networkx as nx # Graphs
+import pydot
 
 hashmap = {}
 observed_vector = []
@@ -21,7 +22,15 @@ list_of_dirs = []
 tkwindow = tkinter.Tk() # Start up TK
 statusString = tkinter.StringVar()
 lb = tkinter.Listbox(tkwindow, height=6, width=200, selectmode=tkinter.MULTIPLE)
+var = tkinter.StringVar(tkwindow) # Hack begins
+sb = tkinter.Spinbox(tkwindow, from_=1, to=15,textvariable=var)
+var.set("8") # Stupid dirty hack ends. Sets the default codebook value to 8.
+G = nx.DiGraph()
+
 	
+#===============================================================================
+# generateTreeFromString generates a tree from string obviously
+#===============================================================================
 def generateTreeFromString(string):
 	hashmap.clear()
 	getLZList(string)  # Generates a hashtable for all variants, stored in 'hashmap'
@@ -166,7 +175,7 @@ def countLeaves(node_tuple):
 		return countLeavesTree(node_tuple[0])
 
 #===============================================================================
-#
+# Finds the leaves in a tree. Returns a list of the leaves.
 #===============================================================================
 def findLeavesTree(root):
 
@@ -174,7 +183,7 @@ def findLeavesTree(root):
 	return l
 
 #===============================================================================
-
+# Method called by above findLeavesTree
 #===============================================================================
 def findLeaves(node_tuple):
 	if isLeaf(node_tuple[0]) == True:
@@ -183,7 +192,7 @@ def findLeaves(node_tuple):
 		return findLeavesTree(node_tuple[0])
 
 #===============================================================================
-#
+# Finds the maximum depth in a tree and returns that integer
 #===============================================================================
 def findMaxDepthTree(root):
 
@@ -191,7 +200,7 @@ def findMaxDepthTree(root):
 	return max(l)
 
 #===============================================================================
-
+# Method used by findMaxDepthTree
 #===============================================================================
 def findMaxDepthLeaves(node_tuple):
 	if isLeaf(node_tuple[0]) == True:
@@ -266,6 +275,38 @@ def printTreeForWolfram(root, name, start=True, f=None):
 		f.write(s)
 		f.close()
 		call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", os.getcwd() + "/" + name + ".nb"])
+
+
+def printTreeWithNetworkX(root,start=True):
+	for son in root.sub_tree:
+		G.add_edge("%s | %d | %f" % (root.name, root.sub_tree_size, root.prob),"%s | %d | %f" % (son[0].name, son[0].sub_tree_size, son[0].prob), weight = son[1].prob)
+		printTreeWithNetworkX(son[0],False)
+	
+	if(start == True):
+		elarge=[(u,v) for (u,v,d) in G.edges(data=True) if d['weight'] >0.1]
+		esmall=[(u,v) for (u,v,d) in G.edges(data=True) if d['weight'] <=0.1]
+		
+		pos=nx.spectral_layout(G,2,'weight',5) # positions for all nodes
+		
+		# nodes
+		nx.draw_networkx_nodes(G,pos,alpha=0.9,node_color='#A5A5A5')
+		# edges
+		#nx.draw_networkx_edges(G,pos,edgelist=elarge,width=2)
+		nx.draw_networkx_edges(G,pos,alpha=0.7,edgelist=esmall+elarge,width=2,edge_color=range(len(esmall+elarge)),edge_cmap=pl.cm.Blues)
+		# labels
+		nx.draw_networkx_labels(G,pos,font_size=8,font_family='sans-serif',font_color='b')
+		
+		pl.axis('off')
+		pl.savefig("weighted_graph.png") # save as png
+		pl.show() # display'''
+		
+		'''nx.write_dot(G,'test.dot')
+		pl.title("draw_networkx")
+		pos = nx.graphviz_layout(G, prog='dot', args="-Grankdir=LR")
+		nx.draw(G,pos,with_labels=False,arrows=False)
+		pl.savefig('nx_test.png')'''
+		
+
 
 
 #===============================================================================
@@ -348,17 +389,25 @@ def parsePcapAndGetQuantizedString(file,wd,max_len=0):
 	f.close()
 	return ''.join(vector)
 
+#===============================================================================
+# flatten flattens a list of lists [[]] -> []
+#===============================================================================
 def flatten(lst):
 	return sum( ([x] if not isinstance(x, list) else flatten(x)
 		     for x in lst), [] )
 
+
+#===============================================================================
+# findNodeProbabilityInList Looks for an item in a list and returns its probability if found
+# or -1 if not found.
+#===============================================================================
 def findNodeProbabilityInList(item, node_list):
 	for li in node_list:
 		if li.name == item.name:
 			return li.prob
 	return -1
 
-# def findClosestProbabilityInList(itemname, node_list):
+# def smoothKLContinuity(itemname, node_list):
 # 	name_list = [ x.name for x in node_list ]
 # 	close_matches = difflib.get_close_matches(itemname, name_list,3,0.3)
 # 	# ratios = [ difflib.SequenceMatcher(None, itemname, x).ratio() for x in close_matches ]
@@ -371,7 +420,12 @@ def findNodeProbabilityInList(item, node_list):
 # 	return r_prob
 
 
-def findClosestProbabilityInList(itemname, node_list):
+#===============================================================================
+# smoothKLContinuity attempts to find the closest match of an item (by name) 
+# in a list of nodes, by looking at the sum of its values. Also makes use of the
+# difflib matcher.
+#===============================================================================
+def smoothKLContinuity(itemname, node_list):
 	name_list = [ x.name for x in node_list ] # Get list of names only
 	close_matches = difflib.get_close_matches(itemname, name_list,len(name_list),0.0) # Find 5 closest matches
 	sums = [ (lambda x: sum([ ord(y) for y in x ]))(x) for x in close_matches] # Generate their sums
@@ -381,6 +435,12 @@ def findClosestProbabilityInList(itemname, node_list):
 	return node_list[name_list.index(close_matches[index_in_sums_list])].prob # Get probability
 	
 	
+#===============================================================================
+# calculateKLDistance Calculates the KL distance between two trees. The third parameter
+# (factor) is used to divide the result of the discontinuity smoother (smoothKLContinuity)
+# so that it is essentially 'distancing' bad matches. Returns a float with the 
+# modified (smoothed) KL distance.
+#===============================================================================
 def calculateKLDistance(tree1, tree2, factor=0.5):
 	p = flatten(findLeavesTree(tree1)) # First list
 	q = flatten(findLeavesTree(tree2))
@@ -397,8 +457,7 @@ def calculateKLDistance(tree1, tree2, factor=0.5):
 		qi_prob = findNodeProbabilityInList(node_item, q)
 		if qi_prob == -1:
 			counter += 1
-			qi_prob = findClosestProbabilityInList(node_item.name, q) * factor
-		
+			qi_prob = smoothKLContinuity(node_item.name, q) * factor
 		kl_distance_sum += (math.log(node_item.prob / qi_prob) * node_item.prob)
 #		else:
 			# If Q contains a zero, we want to handle it in a specific manner. Because KL distance
@@ -408,14 +467,16 @@ def calculateKLDistance(tree1, tree2, factor=0.5):
 #			counter += 1
 			# Factor is the error factor to multiply by the counter. This way, more errors will cause a larger deviation
 			#kl_distance_sum += (counter/len(p))*factor
-#			kl_distance_sum += node_item.prob * factor
-			
-	
-	# print("The distance between the two trees with %d errors is:\t%f" %(counter,kl_distance_sum))
+#			kl_distance_sum += node_item.prob * factor	
 	return kl_distance_sum
 
+#===============================================================================
+# checkTreeShapeDiff is the second of our home-made algorithms. It attempts to find
+# similarity in the tree shapes. The result is a tuple. The first is a boolean stating if
+# the trees are identical. The second lists the number of mismatches found. 
+# TODO: Normalize the number
+#===============================================================================
 def checkTreeShapeDiff(tree1,tree2):
-	# diff = tree1.sub_tree_size - tree2.sub_tree_size
 	if len(tree1.sub_tree)==0 and len(tree2.sub_tree)==0:
 		return (True,0)
 	else:
@@ -474,7 +535,6 @@ def compareTreesByLevel(tree1, tree2):
 	
 	return total
 
-
 def compareTwoTrees(tree1,tree2):
 	if findMaxDepthTree(tree2)>findMaxDepthTree(tree1): # Ensure tree1 is deeper
 		temp = tree2
@@ -482,13 +542,18 @@ def compareTwoTrees(tree1,tree2):
 		tree1 = temp
 	return compareTreesByLevel(tree1,tree2)
 
-def training(dir_list = ['training_1']):
+#===============================================================================
+# training looks in a directory list (should be specified), and for each directory
+# it scans the PCAP files and collects timestamps. Afterwards, it runs
+# the LloydMax generator method, and sets decisiou boundaries. 
+# The second parameter in the function is the size of the codebook. (Default: 8)
+#===============================================================================
+def training(dir_list = ['training_1'], codebook_size = 8):
 	for wd in dir_list:
-		print("Gonna scan dir %s now" % wd)
 		findAllPcapFiles(wd) # Get list of pcap files
 		collectAllRelativeTimestamps(wd)
 		
-	createLloydMaxCodebook(8) # Create code book
+	createLloydMaxCodebook(codebook_size) # Create code book
 	codebook.sort() # Sort the code book
 	# Find decision boundaries
 	decision_boundaries.append(0) # Insert 0 as first boundary
@@ -497,6 +562,9 @@ def training(dir_list = ['training_1']):
 		decision_boundaries.append((value + last_value) / 2) # Boundary is between two centroids in the codebook
 		last_value = value 
 
+#===============================================================================
+# showQuantizations attempts to graph the quantization steps nicely.
+#===============================================================================
 def showQuantizations():
 	X = range(len(codebook))
 	labels = [ chr(97+val) for val in X ]
@@ -524,6 +592,10 @@ def showQuantizations():
 	pl.subplots_adjust(bottom=0.15)
 	pl.show()
 
+#===============================================================================
+# trainingCallback is the method called by tkinter to start the training. It gets
+# the listbox selected directories and starts the training
+#===============================================================================
 def trainingCallback():
 	if len(lb.curselection())<1:
 		statusString.set("You haven't picked any directories")
@@ -534,10 +606,18 @@ def trainingCallback():
 	l = []
 	for i in items:
 		l.append(list_of_dirs[i]) #.replace('/','\\'))
-	training(l)
+	training(l,int(sb.get()))
 	statusString.set("Done training!")
 	tkinter.Button(tkwindow, text="Show quantizations", command=showQuantizations).pack()
+	tkinter.Button(tkwindow, text="Show a sample graph (BBC1)", command=showGraphCallback).pack()
 
+def showGraphCallback():
+	t = generateTreeFromString(parsePcapAndGetQuantizedString("skyp.pcap",'training_1',100))
+	printTreeWithNetworkX(t)
+	
+#===============================================================================
+# Main entry point into the program
+#===============================================================================
 if __name__ == "__main__":
 	tkwindow.title("Traffic Fingerprinting")
 	tkwindow.geometry("640x480")
@@ -553,17 +633,21 @@ if __name__ == "__main__":
 			list_of_dirs.append(x[0][2:])
 			lb.insert(i,x[0][2:])
 			i+=1
-	lb.pack()
+	lb.pack(side=tkinter.TOP)
+	tkinter.Label(tkwindow,text="Codebook size ",font=("Arial", 12),fg="#008000").pack(side=tkinter.TOP)
+	sb.config(width=5)
+	sb.pack(side=tkinter.TOP)
+
 	scrollbar.config(command=lb.yview)
 	
 	
-	tkinter.Button(tkwindow, text="Start Training", command=trainingCallback).pack()
+	tkinter.Button(tkwindow, text="Start Training", command=trainingCallback).pack(side=tkinter.BOTTOM)
 	tkinter.Label(tkwindow,textvariable=statusString,font=("Arial", 16),fg="#000080").pack()
 	statusString.set("Ready...")
 	tkinter.mainloop()
 
+
 	#t = []
-	#t.append(generateTreeFromString(parsePcapAndGetQuantizedString("bbc1.pcap",'training_1',100)))
 	#t.append(generateTreeFromString(parsePcapAndGetQuantizedString("bbc2.pcap",'pcaps',100)))
 #	
 	#t.append(generateTreeFromString(parsePcapAndGetQuantizedString("skyp.pcap",'pcaps',100)))
