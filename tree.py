@@ -495,7 +495,7 @@ def checkTreeShapeDiff(tree1,tree2):
 				else:
 					# Root1 has more children so subtree_sum up all of tree1's subtrees
 					subtree_sum += 1+ (tree1.sub_tree[i][0]).sub_tree_size
-		return (t_or_f, subtree_sum)
+		return (t_or_f==True, subtree_sum)
 				
 def quantDist(left, right): # Always between 0 and 1, unless error: then -1.
 	try:
@@ -609,12 +609,26 @@ def trainingCallback():
 	training(l,int(sb.get()))
 	statusString.set("Done training!")
 	tkinter.Button(tkwindow, text="Show quantizations", command=showQuantizations).pack()
+	tkinter.Button(tkwindow, text="Print tests to console", command=testCallback).pack()
 	tkinter.Button(tkwindow, text="Show a sample graph (BBC1)", command=showGraphCallback).pack()
 
 def showGraphCallback():
-	t = generateTreeFromString(parsePcapAndGetQuantizedString("skyp.pcap",'training_1',100))
+	t = generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2.pcap",'test',100))
 	printTreeWithNetworkX(t)
 	
+def testCallback():
+	t = []
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2.pcap",'test',100)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2_repaired.pcap",'test',100)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_4_repaired.pcap",'test',100)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_5_repaired.pcap",'test',100)))
+	
+	for i in range(len(t)):
+		for j in range(len(t)):
+			print("Tree-shape: Tree %d vs. tree %d: %s" % (i,j,checkTreeShapeDiff(t[i], t[j])))
+			print("Tree-distance (k=0.5): Tree %d vs. tree %d: %s" % (i,j,calculateKLDistance(t[i], t[j], 0.5)))
+	
+
 #===============================================================================
 # Main entry point into the program
 #===============================================================================
@@ -644,21 +658,7 @@ if __name__ == "__main__":
 	tkinter.Button(tkwindow, text="Start Training", command=trainingCallback).pack(side=tkinter.BOTTOM)
 	tkinter.Label(tkwindow,textvariable=statusString,font=("Arial", 16),fg="#000080").pack()
 	statusString.set("Ready...")
-	tkinter.mainloop()
-
-
-	#t = []
-	#t.append(generateTreeFromString(parsePcapAndGetQuantizedString("bbc2.pcap",'pcaps',100)))
-#	
-	#t.append(generateTreeFromString(parsePcapAndGetQuantizedString("skyp.pcap",'pcaps',100)))
-	#t.append(generateTreeFromString(parsePcapAndGetQuantizedString("skyp2.pcap",'pcaps',100)))
-#	
-	#for i in range(4):
-		#for j in range(4):
-			#print("Tree-shape: Tree %d vs. tree %d: %s" % (i,j,checkTreeShapeDiff(t[i], t[j])))
-			#print("Tree-distance (k=0.5): Tree %d vs. tree %d: %s" % (i,j,calculateKLDistance(t[i], t[j], 0.5)))
-	# print(findMaxDepthTree(t))
-	
+	tkinter.mainloop()	
 	
 	
 	
