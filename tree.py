@@ -618,10 +618,9 @@ def showGraphCallback():
 	
 def testCallback():
 	t = []
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2.pcap",'test',100)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2_repaired.pcap",'test',100)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_4_repaired.pcap",'test',100)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_5_repaired.pcap",'test',100)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'training_1',1000)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'training_1',1000)))
+
 	
 	for i in range(len(t)):
 		for j in range(len(t)):
