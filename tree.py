@@ -11,7 +11,6 @@ from matplotlib.transforms import offset_copy # Graphs
 import matplotlib.pyplot as pl # Graphs
 import pylab # Graphs
 import networkx as nx # Graphs
-import pydot
 
 hashmap = {}
 observed_vector = []
