@@ -618,7 +618,7 @@ def showGraphCallback():
 def testCallback():
 	t = []
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',1000)))
-	# t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'test',1000)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_FULL.pcap",'test',1000)))
 
 	
