@@ -609,16 +609,17 @@ def trainingCallback():
 	statusString.set("Done training!")
 	tkinter.Button(tkwindow, text="Show quantizations", command=showQuantizations).pack()
 	tkinter.Button(tkwindow, text="Print tests to console", command=testCallback).pack()
-	tkinter.Button(tkwindow, text="Show a sample graph (BBC1)", command=showGraphCallback).pack()
+	tkinter.Button(tkwindow, text="Show a sample graph (Godlion/Kerogod phishing virus)", command=showGraphCallback).pack()
 
 def showGraphCallback():
-	t = generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2.pcap",'test',100))
+	t = generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',100))
 	printTreeWithNetworkX(t)
 	
 def testCallback():
 	t = []
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'training_1',1000)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'training_1',1000)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',1000)))
+	//t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'test',1000)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_FULL.pcap",'test',1000)))
 
 	
 	for i in range(len(t)):
