@@ -605,7 +605,7 @@ def trainingCallback():
 	l = []
 	for i in items:
 		l.append(list_of_dirs[i]) #.replace('/','\\'))
-	training(l,int(sb.get()))
+	# training(l,int(sb.get()))
 	statusString.set("Done training!")
 	tkinter.Button(tkwindow, text="Show quantizations", command=showQuantizations).pack()
 	tkinter.Button(tkwindow, text="Print tests to console", command=testCallback).pack()
