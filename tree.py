@@ -20,12 +20,21 @@ decision_boundaries = []
 list_of_dirs = []
 tkwindow = tkinter.Tk() # Start up TK
 statusString = tkinter.StringVar()
+isFirstTime = True
 lb = tkinter.Listbox(tkwindow, height=6, width=200, selectmode=tkinter.MULTIPLE)
 var = tkinter.StringVar(tkwindow) # Hack begins
 sb = tkinter.Spinbox(tkwindow, from_=1, to=15,textvariable=var)
 var.set("8") # Stupid dirty hack ends. Sets the default codebook value to 8.
 G = nx.DiGraph()
 
+
+def clearGlobals():
+	hashmap.clear()
+	observed_vector.clear()
+	#file_list.clear()
+	codebook.clear()
+	decision_boundaries.clear()
+	#list_of_dirs.clear()
 	
 #===============================================================================
 # generateTreeFromString generates a tree from string obviously
@@ -179,7 +188,7 @@ def countLeaves(node_tuple):
 def findLeavesTree(root):
 
 	l = [ findLeaves(son) for son in root.sub_tree ]
-	return l
+	return flatten(l)
 
 #===============================================================================
 # Method called by above findLeavesTree
@@ -252,7 +261,26 @@ def setProbEdgesLeaves(node_tuple):
 				print("Error - Probability is 0 in node_tuple[0]. Check please!")
 				return
 			setProbEdgesLeaves(son)  # Now tell the son to do the same
-	
+
+
+#===============================================================================
+# Finds the leaves in a tree. Returns a list of the leaves.
+#===============================================================================
+def genListOfNodes(root):
+	l=[]
+	l.append(root)
+	l.append([ genListOfNodes1(son) for son in root.sub_tree ])
+	return flatten(l)
+
+#===============================================================================
+# Method called by above genListOfNodes
+#===============================================================================
+def genListOfNodes1(node_tuple):
+	if isLeaf(node_tuple[0]) == True:
+		return [node_tuple[0]]
+	else:
+		return genListOfNodes(node_tuple[0])
+
 #===============================================================================
 # printTreeForWolfram prints a tree nicely for WolframMathematica to display
 #===============================================================================
@@ -441,8 +469,10 @@ def smoothKLContinuity(itemname, node_list):
 # modified (smoothed) KL distance.
 #===============================================================================
 def calculateKLDistance(tree1, tree2, factor=0.5):
-	p = flatten(findLeavesTree(tree1)) # First list
-	q = flatten(findLeavesTree(tree2))
+	p = genListOfNodes(tree1) #findLeavesTree(tree1) # First list
+	q = genListOfNodes(tree2) #findLeavesTree(tree2) # Second list
+	# TODO: I altered the above, because I think we may need to do this on all nodes instead of just the leaves.
+	# 
 	
 	if len(p)>len(q):
 		temp = p
@@ -483,10 +513,12 @@ def checkTreeShapeDiff(tree1,tree2):
 		t_or_f = True
 		for i in range(max(len(tree1.sub_tree),len(tree2.sub_tree))):
 			try:
+				# There exists subtrees in both tree1 and tree2 that we haven't checked yet
 				(returned_t_or_f, returned_subtree_sum) = checkTreeShapeDiff(tree1.sub_tree[i][0], tree2.sub_tree[i][0])
 				subtree_sum += returned_subtree_sum
 				t_or_f *= returned_t_or_f
 			except IndexError:
+				# Mismatch in sizes - either tree1 or tree2 have less subtrees, so sum up some differences
 				t_or_f = False
 				if len(tree1.sub_tree)<=i:
 					# Root2 has more childen, so subtree_sum up all of tree2's subtrees
@@ -511,6 +543,7 @@ def quantDist(left, right): # Always between 0 and 1, unless error: then -1.
 ###  3. Check obviously. Verify results
 ###  4. Build some sort of testing framework - so that we can run many tests at once with varying vlaues of factors and length of files and so on.
 ###  5. UI - to make things look nice. 
+###  6. Find string in tree
 
 def compareChildrenOnLevel(tree1, tree2): # Tree1 should be deeper than Tree2
 	smallest = 2
@@ -596,23 +629,40 @@ def showQuantizations():
 # the listbox selected directories and starts the training
 #===============================================================================
 def trainingCallback():
+	global isFirstTime
 	if len(lb.curselection())<1:
 		statusString.set("You haven't picked any directories")
 		return
-	codebook.clear()
-	hashmap.clear()
+	clearGlobals()
 	items = map(int,lb.curselection())	
 	l = []
 	for i in items:
 		l.append(list_of_dirs[i]) #.replace('/','\\'))
-	# training(l,int(sb.get()))
+	training(l,int(sb.get()))
 	statusString.set("Done training!")
-	tkinter.Button(tkwindow, text="Show quantizations", command=showQuantizations).pack()
-	tkinter.Button(tkwindow, text="Print tests to console", command=testCallback).pack()
-	tkinter.Button(tkwindow, text="Show a sample graph (Godlion/Kerogod phishing virus)", command=showGraphCallback).pack()
+	if isFirstTime==True:
+		isFirstTime=False
+		tkinter.Button(tkwindow, text="Show quantizations", command=showQuantizations).pack()
+		tkinter.Button(tkwindow, text="Show histogram", command=showHistogram).pack()
+		tkinter.Button(tkwindow, text="Print tests to console", command=testCallback).pack()
+		tkinter.Button(tkwindow, text="Show a sample graph (Godlion/Kerogod phishing virus)", command=showGraphCallback).pack()
 
+def showHistogram():
+	pl.figure()
+	pl.hist(observed_vector, codebook, normed=True, histtype='bar', rwidth=1)
+	X = range(len(codebook))
+	labels = [ chr(97+val) for val in X ]
+	pl.xlabel('Interval')
+	pl.xticks(codebook, labels)
+	pl.ylabel('Probability')
+	pl.title('Histogram\n Mean: '+"%.4f"%np.mean(observed_vector)+' Variance: '+"%.4f"%np.var(observed_vector))
+	pl.grid(True)
+	pl.autoscale(True, 'both')
+	pl.show()
+
+	
 def showGraphCallback():
-	t = generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',100))
+	t = generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_FULL.pcap",'test',100))
 	printTreeWithNetworkX(t)
 
 def testCallback():
@@ -620,12 +670,12 @@ def testCallback():
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_FULL.pcap",'test',1000)))
-
 	
 	for i in range(len(t)):
 		for j in range(len(t)):
-			print("Tree-shape: Tree %d vs. tree %d: %s" % (i,j,checkTreeShapeDiff(t[i], t[j])))
-			print("Tree-distance (k=0.5): Tree %d vs. tree %d: %s" % (i,j,calculateKLDistance(t[i], t[j], 0.5)))
+			if j != i:
+				print("Tree-shape: Tree %d vs. tree %d: %s" % (i,j,checkTreeShapeDiff(t[i], t[j])))
+				print("Tree-distance (k=0.5): Tree %d vs. tree %d: %s" % (i,j,calculateKLDistance(t[i], t[j], 0.9)))
 	
 
 #===============================================================================
@@ -657,7 +707,4 @@ if __name__ == "__main__":
 	tkinter.Button(tkwindow, text="Start Training", command=trainingCallback).pack(side=tkinter.BOTTOM)
 	tkinter.Label(tkwindow,textvariable=statusString,font=("Arial", 16),fg="#000080").pack()
 	statusString.set("Ready...")
-	tkinter.mainloop()	
-	
-	
-	
+	tkinter.mainloop()
