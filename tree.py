@@ -614,7 +614,7 @@ def trainingCallback():
 def showGraphCallback():
 	t = generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',100))
 	printTreeWithNetworkX(t)
-	
+
 def testCallback():
 	t = []
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',1000)))
