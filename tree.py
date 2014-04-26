@@ -104,9 +104,9 @@ def getLZList(string):
 #===============================================================================
 class node:
 	def __init__(self, name, prob, sons=[], size=0):
-		self.prob = prob  # Probability ('value')
-		self.name = name  # Name ('tag')
-		self.sub_tree = sons  # List of children
+		self.prob = prob 			# Probability ('value')
+		self.name = name  			# Name ('tag')
+		self.sub_tree = sons  		# List of children
 		self.sub_tree_size = size
 
 #===============================================================================
@@ -301,8 +301,9 @@ def printTreeForWolfram(root, name, start=True, f=None):
 		s = "};\nTreePlot[g, Automatic, \"root | %d | %f\", VertexLabeling -> True]" % (root.sub_tree_size, root.prob)
 		f.write(s)
 		f.close()
+		print(s)
 		call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", os.getcwd() + "/" + name + ".nb"])
-
+		#call(["D:\Program Files\Mathematica9\Mathematica.exe", os.getcwd() + "/" + name + ".nb"]) #Shachar Debug
 
 def printTreeWithNetworkX(root,start=True):
 	for son in root.sub_tree:
@@ -410,6 +411,7 @@ def parsePcapAndGetQuantizedString(file,wd,max_len=0):
 		if frame_counter > max_len and max_len>0:
 			break 
 		if frame_counter > 1:
+			print(getCodeFromCodebook(ts - last_time))
 			vector.append(getCodeFromCodebook(ts - last_time))
 		else:
 			vector.append(getCodeFromCodebook(0))
@@ -545,35 +547,99 @@ def quantDist(left, right): # Always between 0 and 1, unless error: then -1.
 ###  4. Build some sort of testing framework - so that we can run many tests at once with varying vlaues of factors and length of files and so on.
 ###  5. UI - to make things look nice. 
 ###  6. Find string in tree
+# Tree1 should be deeper than Tree2
+#def compareChildrenOnLevel(tree1, tree2): 
+#	smallest = 2
+#	total = 0
+#	j=0
+#	print("new round")
+#	for tree1node in tree1.sub_tree:
+#		print("tree1node: %s"%tree1node[0].name)
+#		for tree2node in tree2.sub_tree:
+#			print("tree2node: %s"%tree2node[0].name)
+#			smallest = min(smallest, quantDist(tree1node[0].name[-1], tree2node[0].name[-1]))	
+#			j += compareChildrenOnLevel(tree1node[0], tree2node[0])
+#			print("node1: %s"%tree1node[0].name)
+#			print("node2: %s"%tree2node[0].name)
+#			print("j:%f"%j)
+#		print("smallest:%f"%smallest)
+#		j += min(smallest,1)
+#		print(j)
+#	total += j
+#	return total
 
-def compareChildrenOnLevel(tree1, tree2): # Tree1 should be deeper than Tree2
-	smallest = 2
+#===============================================================================
+# compare tree1 with tree2 on level
+# We call this function for all the levels we want to compare
+# The function computes quant distance for all the nodes in tree1 and level
+#===============================================================================
+def compareLevels(tree1, tree2, level):
 	total = 0
-	j=0
-	for tree1node in tree1.sub_tree:
-		for tree2node in tree2.sub_tree:
-			smallest = min(smallest, quantDist(tree1node[0].name, tree2node[0].name))
-			j += compareChildrenOnLevel(tree1node[0], tree2node[0])
-		j += min(smallest,1)
-	total += j
+	levelList = getNodesInLevel(tree1, level)
+	for nodeName in levelList:
+		total += compareNodeToLevel(nodeName, tree2, level)
 	return total
-	
+#===============================================================================
+# compare node from tree1 with all the level nodes of tree2 
+#
+#===============================================================================
+def compareNodeToLevel (nodeTree1, tree2, level):
+	smallest = 1
+	levelNodes = getNodesInLevel(tree2, level)
+	for node in levelNodes:
+		smallest = min(smallest,quantDist(nodeTree1[-1], node[-1]))				#compare all nodes in level with node from tree1 and get the smallest
+	return smallest	
 
+#===============================================================================
+# returns list of nodes name in level
+#===============================================================================
+	
+def getNodesInLevel(root, level):
+
+	l = [ findLevel(son, level) for son in root.sub_tree ]
+	return flatten(l)
+#===============================================================================
+# used by getNodesInLevel to find nodes in level
+#===============================================================================
+def findLevel(node_tuple, level):
+	if len(node_tuple[0].name) == level:
+		return node_tuple[0].name
+	else:
+		return getNodesInLevel(node_tuple[0], level)
+#===============================================================================
+# compare tree1 to tree2 quant distance.
+# return distance between 0 and 1
+#===============================================================================
 def compareTreesByLevel(tree1, tree2):
 	total = 0
-	total += compareChildrenOnLevel(tree1,tree2)
-	for c1 in tree1.sub_tree:
-		for c2 in tree2.sub_tree:
-			total += compareTreesByLevel(c1[0], c2[0])
-	
-	return total
+	level = 1
+	levelNumT1 = findMaxDepthTree(tree1)
+#	levelNumT2 = findMaxDepthTree(tree2)
+	while level <= levelNumT1:
+		total += compareLevels(tree1, tree2, level)
+		level += 1
+#	try:
+	return total / levelNumT1
+#	except ZeroDivisionError:
+#		return total / levelNumT1
 
-def compareTwoTrees(tree1,tree2):
-	if findMaxDepthTree(tree2)>findMaxDepthTree(tree1): # Ensure tree1 is deeper
-		temp = tree2
-		tree2 = tree1
-		tree1 = temp
-	return compareTreesByLevel(tree1,tree2)
+
+
+# def compareTreesByLevel(tree1, tree2):
+# 	total = 0
+# 	total += compareChildrenOnLevel(tree1,tree2)
+# 	for c1 in tree1.sub_tree:
+# 		for c2 in tree2.sub_tree:
+# 			total += compareTreesByLevel(c1[0], c2[0])
+# 	
+# 	return total
+# 
+# def compareTwoTrees(tree1,tree2):
+# 	if findMaxDepthTree(tree2)>findMaxDepthTree(tree1): # Ensure tree1 is deeper
+# 		temp = tree2
+# 		tree2 = tree1
+# 		tree1 = temp
+# 	return compareTreesByLevel(tree1,tree2)
 
 #===============================================================================
 # training looks in a directory list (should be specified), and for each directory
@@ -709,3 +775,27 @@ if __name__ == "__main__":
 	tkinter.Label(tkwindow,textvariable=statusString,font=("Arial", 16),fg="#000080").pack()
 	statusString.set("Ready...")
 	tkinter.mainloop()
+
+	#Shahcar debug
+	#codebook = [4.0310488949706527e-05, 9.3195956741198613e-05, 0.00020149158135426259, 0.00064,281237399342194, 0.026027964123694427, 0.29396334375591576, 0.80557135756236176,5.271625048295955]
+#	codebook = [1,2,3,4,5,6,7,8,9]
+#	string = "aaaaaa"
+#	string2 = "aaaaaa"
+#	list1 = []
+#	t1 = generateTreeFromString(string)
+#	t2 = generateTreeFromString(string2)
+	#printTreeForWolfram(t2, "t2")
+	#printTreeForWolfram(t1, "t1")
+#	print(getNodesInLevel(t1,2))
+#	print(getNodesInLevel(t2,2))
+#	x= compareTreesByLevel(t1,t2)
+#	print(x)
+#	print(checkTreeShapeDiff(t1,t2))
+#	total = compareChildrenOnLevel(t1,t2)
+#	print("total:%f"%total)
+#	treeLevels = findMaxDepthTree(t1)+findMaxDepthTree(t2)
+#	str1 = ("compare by level: %f" %(total/treeLevels))
+#	print(str1)
+	
+	
+	
