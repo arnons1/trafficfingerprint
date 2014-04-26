@@ -4,7 +4,7 @@ import dpkt # Wireshark parsing
 import math
 import difflib # Finding closest strings
 from nt import getcwd # Get current working directory
-from scipy.cluster.vq import kmeans, whiten # Kmeans clustering
+from scipy.cluster.vq import kmeans, kmeans2, whiten # Kmeans clustering
 import tkinter # UI
 import numpy as np # Number methods (average, median, stdev,...
 from matplotlib.transforms import offset_copy # Graphs
@@ -376,7 +376,8 @@ def collectRelativeTimestampsForSingleFile(file,wd):
 # observation vector.
 #===============================================================================
 def createLloydMaxCodebook(num_codes):
-	whitened = whiten(observed_vector)
+	whitened = np.array(observed_vector) #whiten(observed_vector)
+	#(vec, _error) = kmeans2(whitened, num_codes, iter=20, thresh=1e-05, minit='random')
 	(vec, _error) = kmeans(whitened, num_codes, 20, 1e-05)  # 10 is number of codes, 20 is number of iteration, 1e-05 is the error we want
 	for value in vec:
 		codebook.append(value) # Append centroid value to the list
