@@ -684,7 +684,7 @@ def testCallback():
 if __name__ == "__main__":
 	tkwindow.title("Traffic Fingerprinting")
 	tkwindow.geometry("640x480")
-	tkwindow.wm_iconbitmap('fingerprint.ico')
+	# tkwindow.wm_iconbitmap('fingerprint.ico')
 	tkinter.Label(tkwindow,text="Pick directories to perform training on from below: ").pack()
 	i=0
 	scrollbar = tkinter.Scrollbar(tkwindow)
