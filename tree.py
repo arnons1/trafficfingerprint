@@ -4,9 +4,10 @@ import dpkt # Wireshark parsing
 import math
 import difflib # Finding closest strings
 from nt import getcwd # Get current working directory
-from scipy.cluster.vq import kmeans, kmeans2, whiten # Kmeans clustering
+from scipy.cluster.vq import kmeans #, kmeans2, whiten # Kmeans clustering
 import tkinter # UI
-import numpy as np # Number methods (average, median, stdev,...
+import tkinter.scrolledtext as tkst
+import numpy as np # Number methods (average, median, stdev,...)
 from matplotlib.transforms import offset_copy # Graphs
 import matplotlib.pyplot as pl # Graphs
 import pylab # Graphs
@@ -18,16 +19,45 @@ file_list = []
 codebook = []
 decision_boundaries = []
 list_of_dirs = []
-tkwindow = tkinter.Tk() # Start up TK
-statusString = tkinter.StringVar()
 isFirstTime = True
-lb = tkinter.Listbox(tkwindow, height=6, width=200, selectmode=tkinter.MULTIPLE)
-var = tkinter.StringVar(tkwindow) # Hack begins
-sb = tkinter.Spinbox(tkwindow, from_=1, to=15,textvariable=var)
-var.set("8") # Stupid dirty hack ends. Sets the default codebook value to 8.
 G = nx.DiGraph()
 
+#===============================================================================
+# node is a tree node. It contains a name, probability and a list of sons  
+#===============================================================================
+class node:
+	def __init__(self, name, prob, sons=[], size=0):
+		self.prob = prob 			# Probability ('value')
+		self.name = name  			# Name ('tag')
+		self.sub_tree = sons  		# List of children
+		self.sub_tree_size = size
 
+#===============================================================================
+# Stores a float.
+# This is because we miscalculated the need for updating probabilities when we
+# used a tuple. This is a bypass to the immutability of a tuple. 
+#===============================================================================
+class edgeprob:
+	def __init__(self, prob=0.0):
+		self.prob = prob
+		
+		
+class tkstuff:
+	def __init__(self, codebook_default="8"):
+		self.window = tkinter.Tk() # Start up TK
+		self.directorylb = tkinter.Listbox(self.window, height=6, width=50, selectmode=tkinter.MULTIPLE)
+		self.statusString = tkinter.StringVar()
+		self.var = tkinter.StringVar(self.window) # Hack begins
+		self.sb = tkinter.Spinbox(self.window, from_=1, to=15,textvariable=self.var)
+		self.var.set("8") # Stupid dirty hack ends. Sets the default codebook value to 8.
+		self.tb = tkst.ScrolledText(
+ 								master = self.window,
+     							wrap   = tkinter.WORD,
+	 							width  = 80,
+		    	 				height = 20, font=("Courier New",8)
+		    	 				)
+
+		
 def clearGlobals():
 	hashmap.clear()
 	observed_vector.clear()
@@ -99,24 +129,6 @@ def getLZList(string):
 				start = end
 				end += 1
 	
-#===============================================================================
-# node is a tree node. It contains a name, probability and a list of sons  
-#===============================================================================
-class node:
-	def __init__(self, name, prob, sons=[], size=0):
-		self.prob = prob 			# Probability ('value')
-		self.name = name  			# Name ('tag')
-		self.sub_tree = sons  		# List of children
-		self.sub_tree_size = size
-
-#===============================================================================
-# Stores a float.
-# This is because we miscalculated the need for updating probabilities when we
-# used a tuple. This is a bypass to the immutability of a tuple. 
-#===============================================================================
-class edgeprob:
-	def __init__(self, prob=0.0):
-		self.prob = prob
 	
 #===============================================================================
 # buildTree builds a tree given a sorted list of items (from the hashmap usually)
@@ -490,7 +502,7 @@ def calculateKLDistance(tree1, tree2, factor=0.5):
 		if qi_prob == -1:
 			counter += 1
 			qi_prob = smoothKLContinuity(node_item.name, q) * factor
-		kl_distance_sum += (math.log(node_item.prob / qi_prob) * node_item.prob)
+		kl_distance_sum += (math.log(node_item.prob / qi_prob, len(codebook)) * node_item.prob) # Log with base len(codebook) (size of our alphabet)
 #		else:
 			# If Q contains a zero, we want to handle it in a specific manner. Because KL distance
 			# Is undefined for cases in which the distribution is not continuous. Therefore, we will define
@@ -696,23 +708,24 @@ def showQuantizations():
 # the listbox selected directories and starts the training
 #===============================================================================
 def trainingCallback():
-	global isFirstTime
-	if len(lb.curselection())<1:
-		statusString.set("You haven't picked any directories")
+	global isFirstTime, tkc
+	if len(tkc.directorylb.curselection())<1:
+		tkc.statusString.set("You haven't picked any directories")
 		return
 	clearGlobals()
-	items = map(int,lb.curselection())	
+	items = map(int,tkc.directorylb.curselection())	
 	l = []
 	for i in items:
 		l.append(list_of_dirs[i]) #.replace('/','\\'))
-	training(l,int(sb.get()))
-	statusString.set("Done training!")
+	training(l,int(tkc.sb.get()))
+	tkc.statusString.set("Done training!")
 	if isFirstTime==True:
 		isFirstTime=False
-		tkinter.Button(tkwindow, text="Show quantizations", command=showQuantizations).pack()
-		tkinter.Button(tkwindow, text="Show histogram", command=showHistogram).pack()
-		tkinter.Button(tkwindow, text="Print tests to console", command=testCallback).pack()
-		tkinter.Button(tkwindow, text="Show a sample graph (Godlion/Kerogod phishing virus)", command=showGraphCallback).pack()
+		tkinter.Button(tkc.window, text="  Show quantizations  ", command=showQuantizations).grid(row=5,column=0, columnspan=2, sticky=tkinter.W)
+		tkinter.Button(tkc.window, text="   Show histogram  ", command=showHistogram).grid(row=5,column=2, columnspan=2, sticky=tkinter.W)
+		tkinter.Button(tkc.window, text="Print tests to console ", command=testCallback).grid(row=6, column=0, columnspan=2, sticky=tkinter.W)
+		tkinter.Button(tkc.window, text="Show sample graph", command=showGraphCallback).grid(row=6, column=2, columnspan=2, sticky=tkinter.W)
+		tkc.tb.grid(row=7,columnspan=6,rowspan=6, sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
 
 def showHistogram():
 	pl.figure()
@@ -733,47 +746,51 @@ def showGraphCallback():
 	printTreeWithNetworkX(t)
 
 def testCallback():
+	global tkc
 	t = []
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_FULL.pcap",'test',1000)))
-	
+	tstr = ""
 	for i in range(len(t)):
 		for j in range(len(t)):
-			if j != i:
-				print("Tree-shape: Tree %d vs. tree %d: %s" % (i,j,checkTreeShapeDiff(t[i], t[j])))
-				print("Tree-distance (k=0.5): Tree %d vs. tree %d: %s" % (i,j,calculateKLDistance(t[i], t[j], 0.9)))
+			if j != i:			
+				tstr += ("Tree-shape: Tree %d vs. tree %d: %s\n" % (i,j,checkTreeShapeDiff(t[i], t[j])))
+				tstr += ("Tree-distance (k=0.5): Tree %d vs. tree %d: %s\n===============================\n" % (i,j,calculateKLDistance(t[i], t[j], 0.9)))
+	tkc.tb.insert(tkinter.INSERT,tstr)
 	
 
 #===============================================================================
 # Main entry point into the program
 #===============================================================================
 if __name__ == "__main__":
-	tkwindow.title("Traffic Fingerprinting")
-	tkwindow.geometry("640x480")
-	tkwindow.wm_iconbitmap('fingerprint.ico')
-	tkinter.Label(tkwindow,text="Pick directories to perform training on from below: ").pack()
+	global tkc
+	tkc = tkstuff()
+	tkc.window.title("Traffic Fingerprinting")
+	tkc.window.geometry("600x600")
+	tkc.window.wm_iconbitmap('fingerprint.ico')
+	tkinter.Label(tkc.window,text="Pick directories to perform training on from below: ").grid(row=0, column=0, columnspan=4, sticky=tkinter.W+tkinter.E)
 	i=0
-	scrollbar = tkinter.Scrollbar(tkwindow)
-	scrollbar.pack(side=tkinter.RIGHT, fill=tkinter.Y)
-	lb.config(yscrollcommand=scrollbar.set)
+	scrollbar = tkinter.Scrollbar(tkc.window)
+	tkc.directorylb.config(yscrollcommand=scrollbar.set)
 	
 	for x in os.walk('.'):
 		if not "git" in x[0] and x[0] != ".":
 			list_of_dirs.append(x[0][2:])
-			lb.insert(i,x[0][2:])
+			tkc.directorylb.insert(i,x[0][2:])
 			i+=1
-	lb.pack(side=tkinter.TOP)
-	tkinter.Label(tkwindow,text="Codebook size ",font=("Arial", 12),fg="#008000").pack(side=tkinter.TOP)
-	sb.config(width=5)
-	sb.pack(side=tkinter.TOP)
+	tkc.directorylb.grid(row=1, column=1, columnspan=3, padx=5)#pack(side=tkinter.TOP)
+	scrollbar.grid(row=1,column=0, sticky=tkinter.N+tkinter.S)
+	tkinter.Label(tkc.window,text="Codebook size ",font=("Arial", 12),fg="#008000").grid(row=2,column=0, columnspan=3, sticky=tkinter.E)#pack(side=tkinter.TOP)
+	tkc.sb.config(width=5)
+	tkc.sb.grid(row=2, column=3, sticky=tkinter.W)#pack(side=tkinter.TOP)
 
-	scrollbar.config(command=lb.yview)
+	scrollbar.config(command=tkc.directorylb.yview)
 	
 	
-	tkinter.Button(tkwindow, text="Start Training", command=trainingCallback).pack(side=tkinter.BOTTOM)
-	tkinter.Label(tkwindow,textvariable=statusString,font=("Arial", 16),fg="#000080").pack()
-	statusString.set("Ready...")
+	tkinter.Button(tkc.window, text="Start Training", command=trainingCallback).grid(row=3,columnspan=4)#pack(side=tkinter.BOTTOM)
+	tkinter.Label(tkc.window,textvariable=tkc.statusString,font=("Arial", 16),fg="#000080").grid(row=4,columnspan=4)# pack()
+	tkc.statusString.set("Ready...")
 	tkinter.mainloop()
 
 	#Shahcar debug
