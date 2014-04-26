@@ -708,3 +708,4 @@ if __name__ == "__main__":
 	tkinter.Label(tkwindow,textvariable=statusString,font=("Arial", 16),fg="#000080").pack()
 	statusString.set("Ready...")
 	tkinter.mainloop()
+	#sdgkljhdfg
