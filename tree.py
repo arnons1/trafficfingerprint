@@ -768,22 +768,30 @@ def testCallback():
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_FULL.pcap",'test',1000)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_4_repaired.pcap",'test',1000)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_5_repaired.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2.pcap",'test',1000)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2_noisy.pcap",'test',1000)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker3_gamma_290114-18_14_06.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("NetSprint_Toolbar_ActiveX_toolbar.dll_Denial_of_Service_POC.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("tbot_2E1814CCCF0C3BB2CC32E0A0671C0891.pcap",'test',1000)))
+	tnames = ["Kerogod fingerprint","Kerogod capture","Kerogod full capture (noisy)","Cryptlocker 1 fingerprint","Cryptlocker 2 fingerprint","Cryptlocker (noisy)","Cryptlocker (many, noisy)","Netsprint DOS malware","tbot capture (noisy)"]
 	tstr = ""
 	tstr += "Centroids: %s\n"%codebook
-	tstr += "Decision Boundaries %s\n"%decision_boundaries
+	tstr += "Decision Boundaries %s\n\n"%decision_boundaries
 	for i in range(len(t)):
 		for j in range(len(t)):
 			if j != i:			
-				tstr += ("===Tree %d vs %d===\n"%(i,j))
+				tstr += ("===Tree %s vs %s===\n"%(tnames[i],tnames[j]))
 				(tf,val) = (checkTreeShapeDiff(t[i], t[j]))
 				val=val/t[i].sub_tree_size
-				tstr += ("Tree-shape: \t\t(%s,%s)\n")%(tf,val)
-				tstr += ("Tree-distance (k=0.2):\t%f \n")%(calculateKLDistance(t[i], t[j], 0.2))
-				tstr += ("Tree compareByLevel: \t%f \n")%(compareTreesByLevel(t[i], t[j]))
+				tstr += ("Tree-shape: \t\t\t(%s,%s)\n")%(tf,val)
+				tstr += ("Tree-distance (k=0.05):\t%f \n")%(calculateKLDistance(t[i], t[j], 0.05))
+				ctbl = compareTreesByLevel(t[i], t[j])
+				if(ctbl==0.0): 
+					ts = "<-- MATCH"
+				else:
+					ts = ""
+				tstr += ("Tree compareByLevel: \t\t%f %s\n")%(ctbl , ts)
 				tstr += ("\n=================\n")
 	tkc.tb.insert(tkinter.INSERT,tstr)
 	
@@ -795,7 +803,7 @@ if __name__ == "__main__":
 	global tkc
 	tkc = tkstuff()
 	tkc.window.title("Traffic Fingerprinting")
-	tkc.window.geometry("600x600")
+	tkc.window.geometry("700x600")
 	tkc.window.wm_iconbitmap('fingerprint.ico')
 	tkinter.Label(tkc.window,text="Pick directories to perform training on from below: ").grid(row=0, column=0, columnspan=4, sticky=tkinter.W+tkinter.E)
 	i=0
@@ -803,7 +811,7 @@ if __name__ == "__main__":
 	tkc.directorylb.config(yscrollcommand=scrollbar.set)
 	
 	for x in os.walk('.'):
-		if not "git" in x[0] and x[0] != ".":
+		if not "git" in x[0] and not "prerequisites" in x[0] and not ".eclipse" in x[0]:
 			list_of_dirs.append(x[0][2:])
 			tkc.directorylb.insert(i,x[0][2:])
 			i+=1
@@ -820,27 +828,4 @@ if __name__ == "__main__":
 	tkinter.Label(tkc.window,textvariable=tkc.statusString,font=("Arial", 16),fg="#000080").grid(row=4,columnspan=4)# pack()
 	tkc.statusString.set("Ready...")
 	tkinter.mainloop()
-
-	#Shahcar debug
-	#codebook = [4.0310488949706527e-05, 9.3195956741198613e-05, 0.00020149158135426259, 0.00064,281237399342194, 0.026027964123694427, 0.29396334375591576, 0.80557135756236176,5.271625048295955]
-#	codebook = [1,2,3,4,5,6,7,8,9]
-#	string = "aaaaaa"
-#	string2 = "aaaaaa"
-#	list1 = []
-#	t1 = generateTreeFromString(string)
-#	t2 = generateTreeFromString(string2)
-	#printTreeForWolfram(t2, "t2")
-	#printTreeForWolfram(t1, "t1")
-#	print(getNodesInLevel(t1,2))
-#	print(getNodesInLevel(t2,2))
-#	x= compareTreesByLevel(t1,t2)
-#	print(x)
-#	print(checkTreeShapeDiff(t1,t2))
-#	total = compareChildrenOnLevel(t1,t2)
-#	print("total:%f"%total)
-#	treeLevels = findMaxDepthTree(t1)+findMaxDepthTree(t2)
-#	str1 = ("compare by level: %f" %(total/treeLevels))
-#	print(str1)
-	
-	
 	
