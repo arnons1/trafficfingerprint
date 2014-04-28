@@ -313,7 +313,6 @@ def printTreeForWolfram(root, name, start=True, f=None):
 		s = "};\nTreePlot[g, Automatic, \"root | %d | %f\", VertexLabeling -> True]" % (root.sub_tree_size, root.prob)
 		f.write(s)
 		f.close()
-		print(s)
 		call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", os.getcwd() + "/" + name + ".nb"])
 		#call(["D:\Program Files\Mathematica9\Mathematica.exe", os.getcwd() + "/" + name + ".nb"]) #Shachar Debug
 
@@ -423,7 +422,6 @@ def parsePcapAndGetQuantizedString(file,wd,max_len=0):
 		if frame_counter > max_len and max_len>0:
 			break 
 		if frame_counter > 1:
-			print(getCodeFromCodebook(ts - last_time))
 			vector.append(getCodeFromCodebook(ts - last_time))
 		else:
 			vector.append(getCodeFromCodebook(0))
@@ -542,13 +540,15 @@ def checkTreeShapeDiff(tree1,tree2):
 					# Root1 has more children so subtree_sum up all of tree1's subtrees
 					subtree_sum += 1+ (tree1.sub_tree[i][0]).sub_tree_size
 		return (t_or_f==True, subtree_sum)
-				
+	
+		
 def quantDist(left, right): # Always between 0 and 1, unless error: then -1.
 	try:
 		entirerange = codebook[-1]-codebook[0]
 		return abs(codebook[ ord(left)-97 ] - codebook[ ord(right)-97 ])/entirerange # Quantization distance is the distance between two centroids
 	except IndexError:
-		return -1		
+		print("l: %s r: %s not found" %(left,right))
+		return 1		
 
 
 
@@ -559,26 +559,7 @@ def quantDist(left, right): # Always between 0 and 1, unless error: then -1.
 ###  4. Build some sort of testing framework - so that we can run many tests at once with varying vlaues of factors and length of files and so on.
 ###  5. UI - to make things look nice. 
 ###  6. Find string in tree
-# Tree1 should be deeper than Tree2
-#def compareChildrenOnLevel(tree1, tree2): 
-#	smallest = 2
-#	total = 0
-#	j=0
-#	print("new round")
-#	for tree1node in tree1.sub_tree:
-#		print("tree1node: %s"%tree1node[0].name)
-#		for tree2node in tree2.sub_tree:
-#			print("tree2node: %s"%tree2node[0].name)
-#			smallest = min(smallest, quantDist(tree1node[0].name[-1], tree2node[0].name[-1]))	
-#			j += compareChildrenOnLevel(tree1node[0], tree2node[0])
-#			print("node1: %s"%tree1node[0].name)
-#			print("node2: %s"%tree2node[0].name)
-#			print("j:%f"%j)
-#		print("smallest:%f"%smallest)
-#		j += min(smallest,1)
-#		print(j)
-#	total += j
-#	return total
+
 
 #===============================================================================
 # compare tree1 with tree2 on level
@@ -599,6 +580,8 @@ def compareNodeToLevel (nodeTree1, tree2, level):
 	smallest = 1
 	levelNodes = getNodesInLevel(tree2, level)
 	for node in levelNodes:
+		print("node %s"%node)
+		print("nodetree1 %s"%nodeTree1)
 		smallest = min(smallest,quantDist(nodeTree1[-1], node[-1]))				#compare all nodes in level with node from tree1 and get the smallest
 	return smallest	
 
@@ -626,32 +609,11 @@ def compareTreesByLevel(tree1, tree2):
 	total = 0
 	level = 1
 	levelNumT1 = findMaxDepthTree(tree1)
-#	levelNumT2 = findMaxDepthTree(tree2)
 	while level <= levelNumT1:
 		total += compareLevels(tree1, tree2, level)
 		level += 1
-#	try:
 	return total / levelNumT1
-#	except ZeroDivisionError:
-#		return total / levelNumT1
 
-
-
-# def compareTreesByLevel(tree1, tree2):
-# 	total = 0
-# 	total += compareChildrenOnLevel(tree1,tree2)
-# 	for c1 in tree1.sub_tree:
-# 		for c2 in tree2.sub_tree:
-# 			total += compareTreesByLevel(c1[0], c2[0])
-# 	
-# 	return total
-# 
-# def compareTwoTrees(tree1,tree2):
-# 	if findMaxDepthTree(tree2)>findMaxDepthTree(tree1): # Ensure tree1 is deeper
-# 		temp = tree2
-# 		tree2 = tree1
-# 		tree1 = temp
-# 	return compareTreesByLevel(tree1,tree2)
 
 #===============================================================================
 # training looks in a directory list (should be specified), and for each directory
@@ -668,10 +630,11 @@ def training(dir_list = ['training_1'], codebook_size = 8):
 	codebook.sort() # Sort the code book
 	# Find decision boundaries
 	decision_boundaries.append(0) # Insert 0 as first boundary
-	last_value = 0;
-	for value in codebook:
-		decision_boundaries.append((value + last_value) / 2) # Boundary is between two centroids in the codebook
-		last_value = value 
+	i=1
+	while i<len(codebook):
+		decision_boundaries.append((codebook[i]+codebook[i-1])*0.5)
+		i+=1
+		
 
 #===============================================================================
 # showQuantizations attempts to graph the quantization steps nicely.
@@ -742,8 +705,14 @@ def showHistogram():
 
 	
 def showGraphCallback():
-	t = generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_FULL.pcap",'test',100))
-	printTreeWithNetworkX(t)
+	t0=(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',1000)))
+	t1=(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'test',1000)))
+	t2=(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_FULL.pcap",'test',1000)))
+	
+	printTreeForWolfram(t0, "t0")
+	printTreeForWolfram(t1, "t1")
+	printTreeForWolfram(t2, "t2")
+	#printTreeWithNetworkX(t)
 
 def testCallback():
 	global tkc
@@ -751,12 +720,21 @@ def testCallback():
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'test',1000)))
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_FULL.pcap",'test',1000)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2.pcap",'test',1000)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2_noisy.pcap",'test',1000)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("NetSprint_Toolbar_ActiveX_toolbar.dll_Denial_of_Service_POC.pcap",'test',1000)))
+	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("tbot_2E1814CCCF0C3BB2CC32E0A0671C0891.pcap",'test',1000)))
 	tstr = ""
+	tstr += "Centroids: %s\n"%codebook
+	tstr += "Decision Boundaries %s\n"%decision_boundaries
 	for i in range(len(t)):
 		for j in range(len(t)):
 			if j != i:			
-				tstr += ("Tree-shape: Tree %d vs. tree %d: %s\n" % (i,j,checkTreeShapeDiff(t[i], t[j])))
-				tstr += ("Tree-distance (k=0.5): Tree %d vs. tree %d: %s\n===============================\n" % (i,j,calculateKLDistance(t[i], t[j], 0.9)))
+				tstr += ("===Tree %d vs %d===\n"%(i,j))
+				tstr += ("Tree-shape: \t\t(%s,%s)\n")%(checkTreeShapeDiff(t[i], t[j]))
+				tstr += ("Tree-distance (k=0.9):\t%f \n")%(calculateKLDistance(t[i], t[j], 0.9))
+				tstr += ("Tree compareByLevel: \t%f \n")%(compareTreesByLevel(t[i], t[j]))
+				tstr += ("\n=================\n")
 	tkc.tb.insert(tkinter.INSERT,tstr)
 	
 
