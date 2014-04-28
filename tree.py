@@ -54,7 +54,7 @@ class tkstuff:
  								master = self.window,
      							wrap   = tkinter.WORD,
 	 							width  = 80,
-		    	 				height = 20, font=("Courier New",8)
+		    	 				height = 20, font=("Courier New",10)
 		    	 				)
 
 		
@@ -482,15 +482,10 @@ def smoothKLContinuity(itemname, node_list):
 # modified (smoothed) KL distance.
 #===============================================================================
 def calculateKLDistance(tree1, tree2, factor=0.5):
-	p = genListOfNodes(tree1) #findLeavesTree(tree1) # First list
+	p = findLeavesTree(tree1) # Tree1 is the fingerprint. Only leaves.
 	q = genListOfNodes(tree2) #findLeavesTree(tree2) # Second list
 	# TODO: I altered the above, because I think we may need to do this on all nodes instead of just the leaves.
 	# 
-	
-	if len(p)>len(q):
-		temp = p
-		p = q
-		q = temp
 
 	kl_distance_sum = 0
 	counter = 0
@@ -554,11 +549,10 @@ def quantDist(left, right): # Always between 0 and 1, unless error: then -1.
 
 ### TODO:
 ###  1. Normalize the values ('average' them out so that they total 1 per level
-###  2. Pretty sure compareTreesByLevel is redundant for now.
 ###  3. Check obviously. Verify results
 ###  4. Build some sort of testing framework - so that we can run many tests at once with varying vlaues of factors and length of files and so on.
 ###  5. UI - to make things look nice. 
-###  6. Find string in tree
+###  6. Find string in tree   - ????
 
 
 #===============================================================================
@@ -580,8 +574,6 @@ def compareNodeToLevel (nodeTree1, tree2, level):
 	smallest = 1
 	levelNodes = getNodesInLevel(tree2, level)
 	for node in levelNodes:
-		print("node %s"%node)
-		print("nodetree1 %s"%nodeTree1)
 		smallest = min(smallest,quantDist(nodeTree1[-1], node[-1]))				#compare all nodes in level with node from tree1 and get the smallest
 	return smallest	
 
@@ -714,6 +706,14 @@ def showGraphCallback():
 	printTreeForWolfram(t2, "t2")
 	#printTreeWithNetworkX(t)
 
+def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor=0.5 ):
+	(_tf,tsd) = checkTreeShapeDiff(fingerprint, testSubject)
+	tsd=tsd/fingerprint.sub_tree_size
+	kld = abs(calculateKLDistance(fingerprint, testSubject, kldFactor))
+	ctbl = compareTreesByLevel(fingerprint, testSubject)
+	return (weights[0]*tsd+weights[1]*kld+weights[2]*ctbl)
+	
+
 def testCallback():
 	global tkc
 	t = []
@@ -731,8 +731,10 @@ def testCallback():
 		for j in range(len(t)):
 			if j != i:			
 				tstr += ("===Tree %d vs %d===\n"%(i,j))
-				tstr += ("Tree-shape: \t\t(%s,%s)\n")%(checkTreeShapeDiff(t[i], t[j]))
-				tstr += ("Tree-distance (k=0.9):\t%f \n")%(calculateKLDistance(t[i], t[j], 0.9))
+				(tf,val) = (checkTreeShapeDiff(t[i], t[j]))
+				val=val/t[i].sub_tree_size
+				tstr += ("Tree-shape: \t\t(%s,%s)\n")%(tf,val)
+				tstr += ("Tree-distance (k=0.2):\t%f \n")%(calculateKLDistance(t[i], t[j], 0.2))
 				tstr += ("Tree compareByLevel: \t%f \n")%(compareTreesByLevel(t[i], t[j]))
 				tstr += ("\n=================\n")
 	tkc.tb.insert(tkinter.INSERT,tstr)
