@@ -4,14 +4,16 @@ import dpkt # Wireshark parsing
 import math
 import difflib # Finding closest strings
 from nt import getcwd # Get current working directory
-from scipy.cluster.vq import kmeans #, kmeans2, whiten # Kmeans clustering
+#from scipy.cluster.vq import kmeans #, kmeans2, whiten # Kmeans clustering
 import tkinter # UI
 import tkinter.scrolledtext as tkst
 import numpy as np # Number methods (average, median, stdev,...)
 from matplotlib.transforms import offset_copy # Graphs
 import matplotlib.pyplot as pl # Graphs
 import pylab # Graphs
-import networkx as nx # Graphs
+from random import random, choice
+from copy import copy
+
 
 hashmap = {}
 observed_vector = []
@@ -20,7 +22,6 @@ codebook = []
 decision_boundaries = []
 list_of_dirs = []
 isFirstTime = True
-G = nx.DiGraph()
 
 #===============================================================================
 # node is a tree node. It contains a name, probability and a list of sons  
@@ -57,6 +58,81 @@ class tkstuff:
 		    	 				height = 20, font=("Courier New",10)
 		    	 				)
 
+#======================================== KMEANS ++ ===============================================
+class Point:
+	slots__ = ["x", "y", "group"]
+	def __init__(self, x=0.0, y=0.0, group=0):
+		self.x, self.y, self.group = x, y, group
+
+def nearest_cluster_center(point, cluster_centers):
+	"""Distance and index of the closest cluster center"""
+	def sqr_distance_2D(a, b):
+		return (a.x - b.x) ** 2 + (a.y - b.y) ** 2
+	
+	min_index = point.group
+	min_dist = 1e100
+	for i, cc in enumerate(cluster_centers):
+		d = sqr_distance_2D(cc, point)
+		if min_dist > d:
+			min_dist = d
+			min_index = i
+	return (min_index, min_dist)
+
+
+def kpp(points, cluster_centers):
+	cluster_centers[0] = copy(choice(points))
+	d = [0.0 for _ in range(len(points))]
+
+	for i in range(1, len(cluster_centers)):
+		summation = 0
+		for j, p in enumerate(points):
+			d[j] = nearest_cluster_center(p, cluster_centers[:i])[1]
+			summation += d[j]
+		summation *= random()
+		for j, di in enumerate(d):
+			summation -= di
+			if summation > 0:
+				continue
+			cluster_centers[i] = copy(points[j])
+			break
+
+	for p in points:
+		p.group = nearest_cluster_center(p, cluster_centers)[0]
+
+def lloyd(points, nclusters):
+	cluster_centers = [Point() for _ in range(nclusters)]
+	# call k++ init
+	kpp(points, cluster_centers)
+	lenpts10 = len(points) >> 10
+	changed = 0
+	while True:
+		# group element for centroids are used as counters
+		for cc in cluster_centers:
+			cc.x = 0
+			cc.y = 0
+			cc.group = 0
+		for p in points:
+			cluster_centers[p.group].group += 1
+			cluster_centers[p.group].x += p.x
+			cluster_centers[p.group].y += p.y
+		for cc in cluster_centers:
+			cc.x /= cc.group
+			cc.y /= cc.group
+		# find closest centroid of each PointPtr
+		changed = 0
+		for p in points:
+			min_i = nearest_cluster_center(p, cluster_centers)[0]
+			if min_i != p.group:
+				changed += 1
+				p.group = min_i
+		# stop when 99.9% of points are good
+		if changed <= lenpts10:
+			break
+	for i, cc in enumerate(cluster_centers):
+		cc.group = i
+	return cluster_centers
+
+#======================================== KMEANS ++ ===============================================
 		
 def clearGlobals():
 	hashmap.clear()
@@ -313,39 +389,7 @@ def printTreeForWolfram(root, name, start=True, f=None):
 		s = "};\nTreePlot[g, Automatic, \"root | %d | %f\", VertexLabeling -> True]" % (root.sub_tree_size, root.prob)
 		f.write(s)
 		f.close()
-		call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", os.getcwd() + "/" + name + ".nb"])
-		#call(["D:\Program Files\Mathematica9\Mathematica.exe", os.getcwd() + "/" + name + ".nb"]) #Shachar Debug
-
-def printTreeWithNetworkX(root,start=True):
-	for son in root.sub_tree:
-		G.add_edge("%s | %d | %f" % (root.name, root.sub_tree_size, root.prob),"%s | %d | %f" % (son[0].name, son[0].sub_tree_size, son[0].prob), weight = son[1].prob)
-		printTreeWithNetworkX(son[0],False)
-	
-	if(start == True):
-		elarge=[(u,v) for (u,v,d) in G.edges(data=True) if d['weight'] >0.1]
-		esmall=[(u,v) for (u,v,d) in G.edges(data=True) if d['weight'] <=0.1]
-		
-		pos=nx.spectral_layout(G,2,'weight',5) # positions for all nodes
-		
-		# nodes
-		nx.draw_networkx_nodes(G,pos,alpha=0.9,node_color='#A5A5A5')
-		# edges
-		#nx.draw_networkx_edges(G,pos,edgelist=elarge,width=2)
-		nx.draw_networkx_edges(G,pos,alpha=0.7,edgelist=esmall+elarge,width=2,edge_color=range(len(esmall+elarge)),edge_cmap=pl.cm.Blues)
-		# labels
-		nx.draw_networkx_labels(G,pos,font_size=8,font_family='sans-serif',font_color='b')
-		
-		pl.axis('off')
-		pl.savefig("weighted_graph.png") # save as png
-		pl.show() # display'''
-		
-		'''nx.write_dot(G,'test.dot')
-		pl.title("draw_networkx")
-		pos = nx.graphviz_layout(G, prog='dot', args="-Grankdir=LR")
-		nx.draw(G,pos,with_labels=False,arrows=False)
-		pl.savefig('nx_test.png')'''
-		
-
+		call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", os.getcwd() + "/" + name + ".nb"])		
 
 
 #===============================================================================
@@ -388,11 +432,15 @@ def collectRelativeTimestampsForSingleFile(file,wd):
 # observation vector.
 #===============================================================================
 def createLloydMaxCodebook(num_codes):
-	whitened = np.array(observed_vector) #whiten(observed_vector)
+	
 	#(vec, _error) = kmeans2(whitened, num_codes, iter=20, thresh=1e-05, minit='random')
-	(vec, _error) = kmeans(whitened, num_codes, 20, 1e-05)  # 10 is number of codes, 20 is number of iteration, 1e-05 is the error we want
-	for value in vec:
-		codebook.append(value) # Append centroid value to the list
+	# (vec, _error) = kmeans(whitened, num_codes, 20, 1e-05)  # 10 is number of codes, 20 is number of iteration, 1e-05 is the error we want
+	listOfPoints = []
+	for obsitem in observed_vector:
+		listOfPoints.append(Point(obsitem,0.0))
+	cluster_centers = lloyd(listOfPoints, num_codes)
+	for value in cluster_centers:
+		codebook.append(value.x) # Append centroid X value to the list
 	
 
 #===============================================================================
