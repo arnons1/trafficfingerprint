@@ -13,6 +13,7 @@ import matplotlib.pyplot as pl # Graphs
 import pylab # Graphs
 from random import random, choice
 from copy import copy
+from sklearn.metrics import hamming_loss, log_loss
 
 
 hashmap = {}
@@ -495,6 +496,13 @@ def findNodeProbabilityInList(item, node_list):
 			return li.prob
 	return -1
 
+# Identical to above, but just names, not nodes.
+def findTagProbabilityInList(itemname, node_list):
+	for li in node_list:
+		if li.name == itemname:
+			return li.prob
+	return 0
+
 # def smoothKLContinuity(itemname, node_list):
 # 	name_list = [ x.name for x in node_list ]
 # 	close_matches = difflib.get_close_matches(itemname, name_list,3,0.3)
@@ -544,15 +552,6 @@ def calculateKLDistance(tree1, tree2, factor=0.5):
 			counter += 1
 			qi_prob = smoothKLContinuity(node_item.name, q) * factor
 		kl_distance_sum += (math.log(node_item.prob / qi_prob, len(codebook)) * node_item.prob) # Log with base len(codebook) (size of our alphabet)
-#		else:
-			# If Q contains a zero, we want to handle it in a specific manner. Because KL distance
-			# Is undefined for cases in which the distribution is not continuous. Therefore, we will define
-			# a constant/variable which will allow us to give 'weight' to such cases in which one distribution/tree
-			# doesn't contain the values. This will allow us to alter our misdetection / false alarm rates.
-#			counter += 1
-			# Factor is the error factor to multiply by the counter. This way, more errors will cause a larger deviation
-			#kl_distance_sum += (counter/len(p))*factor
-#			kl_distance_sum += node_item.prob * factor	
 	return kl_distance_sum
 
 #===============================================================================
@@ -610,17 +609,18 @@ def quantDist(left, right): # Always between 0 and 1, unless error: then -1.
 #===============================================================================
 def compareLevels(tree1, tree2, level):
 	total = 0
-	levelList = getNodesInLevel(tree1, level)
+	levelList = getNodeNamesInLevel(tree1, level)
 	for nodeName in levelList:
 		total += compareNodeToLevel(nodeName, tree2, level)
 	return total
+
 #===============================================================================
 # compare node from tree1 with all the level nodes of tree2 
 #
 #===============================================================================
 def compareNodeToLevel (nodeTree1, tree2, level):
 	smallest = 1
-	levelNodes = getNodesInLevel(tree2, level)
+	levelNodes = getNodeNamesInLevel(tree2, level)
 	for node in levelNodes:
 		smallest = min(smallest,quantDist(nodeTree1[-1], node[-1]))				#compare all nodes in level with node from tree1 and get the smallest
 	return smallest	
@@ -628,19 +628,18 @@ def compareNodeToLevel (nodeTree1, tree2, level):
 #===============================================================================
 # returns list of nodes name in level
 #===============================================================================
-	
-def getNodesInLevel(root, level):
-
+def getNodeNamesInLevel(root, level):
 	l = [ findLevel(son, level) for son in root.sub_tree ]
 	return flatten(l)
 #===============================================================================
-# used by getNodesInLevel to find nodes in level
+# used by getNodeNamesInLevel to find nodes in level
 #===============================================================================
 def findLevel(node_tuple, level):
 	if len(node_tuple[0].name) == level:
 		return node_tuple[0].name
 	else:
-		return getNodesInLevel(node_tuple[0], level)
+		return getNodeNamesInLevel(node_tuple[0], level)
+	
 #===============================================================================
 # compare tree1 to tree2 quant distance.
 # return distance between 0 and 1
@@ -653,6 +652,50 @@ def compareTreesByLevel(tree1, tree2):
 		total += compareLevels(tree1, tree2, level)
 		level += 1
 	return total / levelNumT1
+
+
+#===============================================================================
+# returns list of nodes name in level
+#===============================================================================
+def getNodesInLevel(root, level):
+	l = [ findLevel2(son, level) for son in root.sub_tree ]
+	return flatten(l)
+#===============================================================================
+# used by getNodesInLevel to find nodes in level
+#===============================================================================
+def findLevel2(node_tuple, level):
+	if len(node_tuple[0].name) == level:
+		return node_tuple[0]
+	else:
+		return getNodesInLevel(node_tuple[0], level)
+	
+def compareFingerprintWithLZListLL(fp, lzlist):
+	totalLogLoss = 0
+	for listElem in lzlist:
+		levelElements = getNodesInLevel(fp,len(listElem)) # Pull out the level from the fingerprint tree
+		nodeProb = findTagProbabilityInList(listElem,levelElements)
+		totalLogLoss += log_loss([listElem],[[nodeProb,1-nodeProb]])
+	return totalLogLoss
+
+def compareFingerprintWithCapture(fp,capturedQuantizedString,windowSize=8):
+	windowSize = min(windowSize,len(capturedQuantizedString)) # Just in case
+	runTimes = len(capturedQuantizedString)-windowSize+1 # Amount of times the loop will have to run
+	for i in range(runTimes):
+		hashmap.clear()
+		getLZList(capturedQuantizedString[i:i+windowSize])  # Generates a hashtable for all variants, stored in 'hashmap'
+		l = sorted(hashmap)  # Sort hashmap and get it as a nice list
+		
+		result = compareFingerprintWithLZListLL(fp, l)
+		if 'smallest' not in locals():
+			smallest = compareFingerprintWithLZListLL(fp, l)
+			print("#1Set smallest to %f"%(smallest))
+		else:
+			if(result<smallest):
+				print("#2Set smallest to %f"%(result))
+				print("Comparing string %s"%(l))
+				print("LZ List is %s"%capturedQuantizedString[i:i+windowSize])
+				smallest = result
+	return smallest
 
 
 #===============================================================================
@@ -762,7 +805,7 @@ def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor
 	return (weights[0]*tsd+weights[1]*kld+weights[2]*ctbl)
 	
 
-def testCallback():
+'''def testCallback():
 	global tkc
 	t = []
 	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',1000)))
@@ -793,8 +836,14 @@ def testCallback():
 					ts = ""
 				tstr += ("Tree compareByLevel: \t\t%f %s\n")%(ctbl , ts)
 				tstr += ("\n=================\n")
+	tkc.tb.insert(tkinter.INSERT,tstr)'''
+
+def testCallback():
+	global tkc
+	fp = generateTreeFromString(parsePcapAndGetQuantizedString("tbot1.pcap",'test',1000))
+	capturestring = parsePcapAndGetQuantizedString("tbot_191B26BAFDF58397088C88A1B3BAC5A6.pcap",'test',5000)
+	tstr = "The result was %f"%(compareFingerprintWithCapture(fp,capturestring))
 	tkc.tb.insert(tkinter.INSERT,tstr)
-	
 
 #===============================================================================
 # Main entry point into the program
