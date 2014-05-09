@@ -8,6 +8,7 @@ from nt import getcwd # Get current working directory
 import tkinter # UI
 import tkinter.scrolledtext as tkst
 import numpy as np # Number methods (average, median, stdev,...)
+import scipy as sp
 from matplotlib.transforms import offset_copy # Graphs
 import matplotlib.pyplot as pl # Graphs
 import pylab # Graphs
@@ -147,8 +148,9 @@ def clearGlobals():
 # generateTreeFromString generates a tree from string obviously
 #===============================================================================
 def generateTreeFromString(string):
+	global hashmap
 	hashmap.clear()
-	getLZList(string)  # Generates a hashtable for all variants, stored in 'hashmap'
+	hashmap = getLZList(string, hashmap)  # Generates a hashtable for all variants, stored in 'hashmap'
 	l = sorted(hashmap)  # Sort hashmap and get it as a nice list
 	t = buildTree(l)  # Build a tree
 	setProbTree(t, countLeavesTree(t))  # Set the probability for the tree nodes 
@@ -183,25 +185,25 @@ def getLZListR(head, tail):
 # Creates a Lempel Ziv style hashmap for a given string, of any alphabet
 # Stores result in a global variable called hashmap. Iterative method
 #===============================================================================
-def getLZList(string):
+def getLZList(string,hashm={}):
 	flag = True
 	tempstr = ''
 	start = 0
 	end = 1
 	while(end <= len(string) and flag == True):
 		tempstr = string[start:end]
-		if tempstr in hashmap:
-			hashmap[tempstr] += 1
+		if tempstr in hashm:
+			hashm[tempstr] += 1
 			if end >= len(string):
 				flag = False
-				return
+				return hashm
 			else:  # More letters to come
 				end += 1
 		else:  # Item isn't in hashmap
-			hashmap[tempstr] = 1  # New entry
+			hashm[tempstr] = 1  # New entry
 			if end == len(string):
 				flag = False
-				return
+				return hashm
 			else:  # More letters to check
 				start = end
 				end += 1
@@ -275,7 +277,6 @@ def countLeaves(node_tuple):
 # Finds the leaves in a tree. Returns a list of the leaves.
 #===============================================================================
 def findLeavesTree(root):
-
 	l = [ findLeaves(son) for son in root.sub_tree ]
 	return flatten(l)
 
@@ -288,6 +289,17 @@ def findLeaves(node_tuple):
 	else:
 		return findLeavesTree(node_tuple[0])
 
+
+def findNodeInTree(root,tag):
+	l = [ findNode(son,tag) for son in root.sub_tree ]
+	return flatten(l)
+
+def findNode(node_tuple,tag):
+	if node_tuple[0].name == tag:
+		return [node_tuple[0]]
+	else:
+		return findNodeInTree(node_tuple[0],tag)
+	
 #===============================================================================
 # Finds the maximum depth in a tree and returns that integer
 #===============================================================================
@@ -542,7 +554,6 @@ def calculateKLDistance(tree1, tree2, factor=0.5):
 	q = genListOfNodes(tree2) #findLeavesTree(tree2) # Second list
 	# TODO: I altered the above, because I think we may need to do this on all nodes instead of just the leaves.
 	# 
-
 	kl_distance_sum = 0
 	counter = 0
 	
@@ -668,35 +679,112 @@ def findLevel2(node_tuple, level):
 		return node_tuple[0]
 	else:
 		return getNodesInLevel(node_tuple[0], level)
-	
+
+def llfun(act, pred):
+	epsilon = 1e-15
+	pred = sp.maximum(epsilon, pred)
+	pred = sp.minimum(1-epsilon, pred)
+	ll = sum(act*sp.log(pred) + sp.subtract(1,act)*sp.log(sp.subtract(1,pred)))
+	ll = ll * -1.0/len(act)
+	return ll
+
 def compareFingerprintWithLZListLL(fp, lzlist):
 	totalLogLoss = 0
+	lzlist = sorted(lzlist)
 	for listElem in lzlist:
 		levelElements = getNodesInLevel(fp,len(listElem)) # Pull out the level from the fingerprint tree
 		nodeProb = findTagProbabilityInList(listElem,levelElements)
-		totalLogLoss += log_loss([listElem],[[nodeProb,1-nodeProb]])
+		print ("Looking for %s in list %s."%(listElem,levelElements))
+		#totalLogLoss += llfun(
+		#					[codebook[ord(listElem)-97]] 
+		#					, nodeProb)
+		epsilon = 1e-15
+		pred = sp.maximum(epsilon, nodeProb)
+		pred = sp.minimum(1-epsilon, pred)
+		ll = log_loss([listElem],[[nodeProb,1-nodeProb]])
+		ll2 = - math.log(pred)
+		if(ll!=ll2):
+			print("LL %f and LL2 %f aren't equal"%(ll,ll2))
+		totalLogLoss += ll
+		print ("New Logloss is %f"%(totalLogLoss))
 	return totalLogLoss
 
+
+def findMaxProbOfNode(node):
+	largest=0
+	for son in node.sub_tree:
+		if son[1].prob>largest:
+			largest = son[1].prob
+			tag = son[0].name
+	return tag
+	
+def compareFingerprintWithLZListHL(fp, window, lzlist):
+	# Find last entry inducted into the LZ List from the window
+	for i in range(len(window)):
+		if window[i:] in lzlist:
+			# Item is contained in LZ List - we can use it
+			longestMatch = window[i:]
+			nodesFound = findNodeInTree(fp,longestMatch)
+			# Find most probable match
+			if len(nodesFound) == 0: # Nothing found
+				# Nothing was found, most probable result is one of the root children
+				estimateTag = findMaxProbOfNode(fp)
+			else: # Found success
+				# Estimate based on this node's children
+				if isLeaf(nodesFound[0]):
+					# Leaf, return same as root
+					estimateTag = findMaxProbOfNode(fp)
+				else:
+					estimateTag = findMaxProbOfNode(nodesFound[0])
+			return estimateTag[-1]
+
+
 def compareFingerprintWithCapture(fp,capturedQuantizedString,windowSize=8):
+	hammingResultVec = []
+	hashmap2 = {}
 	windowSize = min(windowSize,len(capturedQuantizedString)) # Just in case
 	runTimes = len(capturedQuantizedString)-windowSize+1 # Amount of times the loop will have to run
+	print("Runtimes %d"%(runTimes))
 	for i in range(runTimes):
-		hashmap.clear()
-		getLZList(capturedQuantizedString[i:i+windowSize])  # Generates a hashtable for all variants, stored in 'hashmap'
-		l = sorted(hashmap)  # Sort hashmap and get it as a nice list
-		
-		result = compareFingerprintWithLZListLL(fp, l)
+		window = capturedQuantizedString[i:i+windowSize]
+		print("#############window %s" %(window))
+		# Algo1
+		hashmap2.clear()
+		hashmap2 = getLZList(window,hashmap2)  # Generates a hashtable for all variants, stored in 'hashmap'
+		print("=========> HM2 %s"%(hashmap2))
+		result = compareFingerprintWithLZListLL(fp, hashmap2)
 		if 'smallest' not in locals():
-			smallest = compareFingerprintWithLZListLL(fp, l)
-			print("#1Set smallest to %f"%(smallest))
+			smallest = result
 		else:
 			if(result<smallest):
-				print("#2Set smallest to %f"%(result))
-				print("Comparing string %s"%(l))
-				print("LZ List is %s"%capturedQuantizedString[i:i+windowSize])
 				smallest = result
-	return smallest
+		print("Result %f"%result)			
+		# Algo2
+		estimatedTag = compareFingerprintWithLZListHL(fp, window, hashmap2)
+		if i+windowSize+1 <= len(capturedQuantizedString):
+			estimatedWindow = window+estimatedTag
+			realWindow = capturedQuantizedString[i:i+windowSize+1]
+			print("Estimated window %s %s = %s"%(window,estimatedTag,estimatedWindow))
+			print("Real window %s"%(realWindow))
+			res = hamming_loss(list(realWindow),list(estimatedWindow))
+			print("Hamming result was %f"%(res))
+			hammingResultVec.append(res)
+		else:
+			# Do nothing. We've reached the end of the window and don't want to estimate any more.
+			print("Smallest is %f , hwindow is %f"%(smallest,minHammingWindow(hammingResultVec,windowSize)))
+			return (smallest,minHammingWindow(hammingResultVec,windowSize))
+	return (smallest,minHammingWindow(hammingResultVec,windowSize))
 
+def minHammingWindow(hammingResultVec, windowSize=8):
+	minHamming = 1
+	runTimes = len(hammingResultVec)-windowSize+1
+	for i in range(runTimes):
+		window = hammingResultVec[i:i+windowSize]
+		vecSum = sum(window)
+		minHamming = min(vecSum, minHamming)
+	print ("minHamming is %f"%minHamming)
+	return minHamming
+	
 
 #===============================================================================
 # training looks in a directory list (should be specified), and for each directory
@@ -840,9 +928,10 @@ def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor
 
 def testCallback():
 	global tkc
-	fp = generateTreeFromString(parsePcapAndGetQuantizedString("tbot1.pcap",'test',1000))
-	capturestring = parsePcapAndGetQuantizedString("tbot_191B26BAFDF58397088C88A1B3BAC5A6.pcap",'test',5000)
-	tstr = "The result was %f"%(compareFingerprintWithCapture(fp,capturestring))
+	fp = generateTreeFromString(parsePcapAndGetQuantizedString("skyp.pcap",'training_1',1000))
+	capturestring = parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2.pcap",'test',5000)
+	f,l = compareFingerprintWithCapture(fp,capturestring,15)
+	tstr = "The result for #1 was %f %s"%(f,l)
 	tkc.tb.insert(tkinter.INSERT,tstr)
 
 #===============================================================================
