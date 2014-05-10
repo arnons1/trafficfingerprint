@@ -1,10 +1,9 @@
 import os # For starting up Mathematica
 from subprocess import call
-import dpkt # Wireshark parsing
+from dpkt.pcap import Reader # Wireshark parsing
 import math
 import difflib # Finding closest strings
 from nt import getcwd # Get current working directory
-#from scipy.cluster.vq import kmeans #, kmeans2, whiten # Kmeans clustering
 import tkinter # UI
 import tkinter.scrolledtext as tkst
 import numpy as np # Number methods (average, median, stdev,...)
@@ -24,9 +23,10 @@ codebook = []
 decision_boundaries = []
 list_of_dirs = []
 isFirstTime = True
+database=[] # For storing the fingerprints
 
 #===============================================================================
-# node is a tree node. It contains a name, probability and a list of sons  
+# node is a tree node. It contains a name, probability and a list of sons
 #===============================================================================
 class node:
 	def __init__(self, name, prob, sons=[], size=0):
@@ -38,13 +38,21 @@ class node:
 #===============================================================================
 # Stores a float.
 # This is because we miscalculated the need for updating probabilities when we
-# used a tuple. This is a bypass to the immutability of a tuple. 
+# used a tuple. This is a bypass to the immutability of a tuple.
 #===============================================================================
 class edgeprob:
 	def __init__(self, prob=0.0):
 		self.prob = prob
-		
-		
+
+class fingerprint:
+	def __init__(self,tag='',tree=[]):
+		self.tag=tag
+		self.tree=tree
+
+#===============================================================================
+# Class for storing all UI levelElements
+#===============================================================================
+
 class tkstuff:
 	def __init__(self, codebook_default="8"):
 		self.window = tkinter.Tk() # Start up TK
@@ -70,7 +78,7 @@ def nearest_cluster_center(point, cluster_centers):
 	"""Distance and index of the closest cluster center"""
 	def sqr_distance_2D(a, b):
 		return (a.x - b.x) ** 2 + (a.y - b.y) ** 2
-	
+
 	min_index = point.group
 	min_dist = 1e100
 	for i, cc in enumerate(cluster_centers):
@@ -135,7 +143,7 @@ def lloyd(points, nclusters):
 	return cluster_centers
 
 #======================================== KMEANS ++ ===============================================
-		
+
 def clearGlobals():
 	hashmap.clear()
 	observed_vector.clear()
@@ -143,7 +151,7 @@ def clearGlobals():
 	codebook.clear()
 	decision_boundaries.clear()
 	#list_of_dirs.clear()
-	
+
 #===============================================================================
 # generateTreeFromString generates a tree from string obviously
 #===============================================================================
@@ -153,11 +161,11 @@ def generateTreeFromString(string):
 	hashmap = getLZList(string, hashmap)  # Generates a hashtable for all variants, stored in 'hashmap'
 	l = sorted(hashmap)  # Sort hashmap and get it as a nice list
 	t = buildTree(l)  # Build a tree
-	setProbTree(t, countLeavesTree(t))  # Set the probability for the tree nodes 
+	setProbTree(t, countLeavesTree(t))  # Set the probability for the tree nodes
 	setProbEdgesTree(t)  # Set the probability for the tree edges
 	# printTreeForWolfram(t, name)  # Print out the tree for export to Wolfram Mathematica
 	return t
-	
+
 #===============================================================================
 # Creates a Lempel Ziv style hashmap for a given string, of any alphabet
 # Stores result in a global variable called hashmap. Recursive method
@@ -165,13 +173,13 @@ def generateTreeFromString(string):
 def getLZListR(head, tail):
 	global hashmap
 	if len(tail) == 0 and len(head) == 0:  # Empty list
-		return 
+		return
 	if head in hashmap:
 		hashmap[head] += 1  # This item exists. Add one to its counter
 		if len(tail) == 0:
 			return
 		else:  # And if this is not the final letter, try the next combination (recurse)
-			getLZListR(head + tail[0], tail[1:]) 
+			getLZListR(head + tail[0], tail[1:])
 	else:
 		hashmap[head] = 1  # Item wasn't in hashmap, so its brand new entry....
 		if len(tail) == 0:
@@ -180,7 +188,7 @@ def getLZListR(head, tail):
 			getLZListR(tail[0], '')
 		else:  # And there are still more letters to go, so recurse (more than one letter)
 			getLZListR(tail[0], tail[1:])
-			
+
 #===============================================================================
 # Creates a Lempel Ziv style hashmap for a given string, of any alphabet
 # Stores result in a global variable called hashmap. Iterative method
@@ -207,8 +215,8 @@ def getLZList(string,hashm={}):
 			else:  # More letters to check
 				start = end
 				end += 1
-	
-	
+
+
 #===============================================================================
 # buildTree builds a tree given a sorted list of items (from the hashmap usually)
 #===============================================================================
@@ -216,29 +224,29 @@ def buildTree(listToInsert):
 	root = node('root', 0, [])  # Create new root item with probability 0
 	[ insertToTree(root, item) for item in listToInsert ]  # Insert items one by one
 	return root
-		
+
 def insertToTree(root, tag):
 	newitem = (node(tag, 0.0, []), edgeprob(0.0))  # New tuple (Node,Probability of edge)
 	son = 0  # For preventing the last "if" clause
-	
+
 	if isLeaf(root) == True:  # Empty subtree - first tag being inserted
 		root.sub_tree.append(newitem)  # Place in the node's children
 		root.sub_tree_size = 1
 		root.sub_tree.sort(key=lambda sub_tree_item: sub_tree_item[0].name)
-		
+
 	else:  # The subtree isn't empty
 		son = findAppSon(root.sub_tree, tag)  # Find if there exists a child with the correct tag
 		if son != -1:  # It exists, so call this method with that child as the root
 			root.sub_tree_size += 1
 			insertToTree(son[0], tag)
-			
+
 	if isLeaf(root) == False and son == -1:  # No child was found and the root isn't a leaf, so add it to the root.
 		root.sub_tree.append(newitem)
 		root.sub_tree_size += 1
 		root.sub_tree.sort(key=lambda sub_tree_item: sub_tree_item[0].name)
-	
+
 #===============================================================================
-# findAppSon checks if it can find a son with a specific tag. 
+# findAppSon checks if it can find a son with a specific tag.
 # Returns -1 if not found, or the actual son if it was found.
 #===============================================================================
 def findAppSon(sonList, item):
@@ -260,14 +268,14 @@ def isLeaf(node):
 # countLeavesTree counts leaves in a tree, given its root.
 #===============================================================================
 def countLeavesTree(root):
-	l = [ countLeaves(son) for son in root.sub_tree ]
+	l = [ countLeavesTree1(son) for son in root.sub_tree ]
 	return sum(l)
 
 #===============================================================================
 # countLeaves is used by countLeavesTree, but also uses countLeavesTree. See what
 # we did there?
 #===============================================================================
-def countLeaves(node_tuple):
+def countLeavesTree1(node_tuple):
 	if isLeaf(node_tuple[0]) == True:
 		return 1
 	else:
@@ -277,46 +285,48 @@ def countLeaves(node_tuple):
 # Finds the leaves in a tree. Returns a list of the leaves.
 #===============================================================================
 def findLeavesTree(root):
-	l = [ findLeaves(son) for son in root.sub_tree ]
+	l = [ findLeavesTree1(son) for son in root.sub_tree ]
 	return flatten(l)
 
 #===============================================================================
 # Method called by above findLeavesTree
 #===============================================================================
-def findLeaves(node_tuple):
+def findLeavesTree1(node_tuple):
 	if isLeaf(node_tuple[0]) == True:
 		return [node_tuple[0]]
 	else:
 		return findLeavesTree(node_tuple[0])
 
 
+#===============================================================================
+# findNodeInTree finds a specific node by name in the tree and returns it
+#===============================================================================
 def findNodeInTree(root,tag):
-	l = [ findNode(son,tag) for son in root.sub_tree ]
+	l = [ findNodeInTree1(son,tag) for son in root.sub_tree ]
 	return flatten(l)
 
-def findNode(node_tuple,tag):
+def findNodeInTree1(node_tuple,tag):
 	if node_tuple[0].name == tag:
 		return [node_tuple[0]]
 	else:
 		return findNodeInTree(node_tuple[0],tag)
-	
+
 #===============================================================================
 # Finds the maximum depth in a tree and returns that integer
 #===============================================================================
 def findMaxDepthTree(root):
-
-	l = [ findMaxDepthLeaves(son) for son in root.sub_tree ]
+	l = [ findMaxDepthTree1(son) for son in root.sub_tree ]
 	return max(l)
 
 #===============================================================================
 # Method used by findMaxDepthTree
 #===============================================================================
-def findMaxDepthLeaves(node_tuple):
+def findMaxDepthTree1(node_tuple):
 	if isLeaf(node_tuple[0]) == True:
 		return 1
 	else:
 		return 1+findMaxDepthTree(node_tuple[0])
-	
+
 #===============================================================================
 # setProbTree sets probabilities for the nodes (full probability for event)
 # Accepts a tree root and the number of leaves (this is for uniform probability for the leaves)
@@ -337,7 +347,6 @@ def setProbLeaves(node_tuple, num_leaves):
 		l = [ setProbLeaves(son, num_leaves) for son in node_tuple[0].sub_tree ]
 		node_tuple[0].prob = sum(l)
 		return node_tuple[0].prob
-	
 
 #===============================================================================
 # setProbEdgesTree Sets probabilities for the conditional probabilities (edges) for the root
@@ -365,7 +374,7 @@ def setProbEdgesLeaves(node_tuple):
 
 
 #===============================================================================
-# Finds the leaves in a tree. Returns a list of the leaves.
+# genListOfNodes Returns a list of all nodes in the tree including root.
 #===============================================================================
 def genListOfNodes(root):
 	l=[]
@@ -402,7 +411,7 @@ def printTreeForWolfram(root, name, start=True, f=None):
 		s = "};\nTreePlot[g, Automatic, \"root | %d | %f\", VertexLabeling -> True]" % (root.sub_tree_size, root.prob)
 		f.write(s)
 		f.close()
-		call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", os.getcwd() + "/" + name + ".nb"])		
+		call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", os.getcwd() + "/" + name + ".nb"])
 
 
 #===============================================================================
@@ -413,7 +422,7 @@ def findAllPcapFiles(wd):
 	for file in os.listdir(os.path.join(getcwd(),wd)):
 		if file.endswith(".pcap"):
 			file_list.append(os.path.join(getcwd(),wd,file))
-		
+
 #===============================================================================
 # collectAllRelativeTimestamps calls collectRelativeTimestampsForSingleFile for
 # every file in the file list
@@ -428,7 +437,7 @@ def collectAllRelativeTimestamps(wd):
 #===============================================================================
 def collectRelativeTimestampsForSingleFile(file,wd):
 	f = open(file, "rb") # Open file
-	pcapReader = dpkt.pcap.Reader(f) # Parse
+	pcapReader = Reader(f) # Parse
 	frame_counter = 0
 	last_time = 0
 	for ts, _buf in pcapReader:
@@ -439,22 +448,20 @@ def collectRelativeTimestampsForSingleFile(file,wd):
 			observed_vector.append(0) # First frame should have 0 as a timestamp
 		last_time = ts
 	f.close()
+
 #===============================================================================
 # createLloydMaxCodebook creates a quantized vector, with "num_codes" codes in the codebook
-# based on the Lloyd Max quantizing scheme. The data is based on the observed_vector
+# based on the Lloyd Max Kmeans++ scheme. The data is based on the observed_vector
 # observation vector.
 #===============================================================================
 def createLloydMaxCodebook(num_codes):
-	
-	#(vec, _error) = kmeans2(whitened, num_codes, iter=20, thresh=1e-05, minit='random')
-	# (vec, _error) = kmeans(whitened, num_codes, 20, 1e-05)  # 10 is number of codes, 20 is number of iteration, 1e-05 is the error we want
 	listOfPoints = []
 	for obsitem in observed_vector:
-		listOfPoints.append(Point(obsitem,0.0))
+		listOfPoints.append(Point(obsitem,0.0)) # 1D K-Means++ clustering, so Y value is 0
 	cluster_centers = lloyd(listOfPoints, num_codes)
 	for value in cluster_centers:
 		codebook.append(value.x) # Append centroid X value to the list
-	
+
 
 #===============================================================================
 # getCodeFromCodebook gets a code for a specific value from the codebook. Returns a char
@@ -472,16 +479,18 @@ def getCodeFromCodebook(value):
 # parsePcapAndGetQuantizedString Parses a filename specified by 'file' and returns
 # a string, that should be inserted into a tree later
 #===============================================================================
-def parsePcapAndGetQuantizedString(file,wd,max_len=0):
-	f = open(os.path.join(getcwd(),wd,file), "rb")
-	pcapReader = dpkt.pcap.Reader(f)
+def parsePcapAndGetQuantizedString(file,max_len=0,wd=''):
+	if len(wd)>0:
+		file = os.path.join(getcwd(),wd,file)
+	f = open(file, "rb")
+	pcapReader = Reader(f)
 	frame_counter = 0
 	last_time = 0
 	vector = []
 	for ts, _buf in pcapReader:
 		frame_counter += 1
 		if frame_counter > max_len and max_len>0:
-			break 
+			break
 		if frame_counter > 1:
 			vector.append(getCodeFromCodebook(ts - last_time))
 		else:
@@ -515,21 +524,9 @@ def findTagProbabilityInList(itemname, node_list):
 			return li.prob
 	return 0
 
-# def smoothKLContinuity(itemname, node_list):
-# 	name_list = [ x.name for x in node_list ]
-# 	close_matches = difflib.get_close_matches(itemname, name_list,3,0.3)
-# 	# ratios = [ difflib.SequenceMatcher(None, itemname, x).ratio() for x in close_matches ]
-# 	sums = [ (lambda x: sum([ ord(y) for y in x ]))(x) for x in close_matches]
-# 	itemname_sum = sum([ ord(x) for x in itemname ])
-# 	closest = min(sums, key=lambda x:abs(x-itemname_sum))
-# 	index_in_sums_list = sums.index(closest)
-# 	r_prob = node_list[name_list.index(close_matches[index_in_sums_list])].prob
-# 	print("Didn't find %s, matching with %s (prob=%f) instead" %(itemname,close_matches[index_in_sums_list],r_prob))
-# 	return r_prob
-
 
 #===============================================================================
-# smoothKLContinuity attempts to find the closest match of an item (by name) 
+# smoothKLContinuity attempts to find the closest match of an item (by name)
 # in a list of nodes, by looking at the sum of its values. Also makes use of the
 # difflib matcher.
 #===============================================================================
@@ -541,22 +538,21 @@ def smoothKLContinuity(itemname, node_list):
 	closest = min(sums, key=lambda x:abs(x-itemname_sum)) # Find closest entry from the 3 found
 	index_in_sums_list = sums.index(closest)  # Find the index in the original list
 	return node_list[name_list.index(close_matches[index_in_sums_list])].prob # Get probability
-	
-	
+
+
 #===============================================================================
 # calculateKLDistance Calculates the KL distance between two trees. The third parameter
 # (factor) is used to divide the result of the discontinuity smoother (smoothKLContinuity)
-# so that it is essentially 'distancing' bad matches. Returns a float with the 
+# so that it is essentially 'distancing' bad matches. Returns a float with the
 # modified (smoothed) KL distance.
 #===============================================================================
 def calculateKLDistance(tree1, tree2, factor=0.5):
-	p = findLeavesTree(tree1) # Tree1 is the fingerprint. Only leaves.
+	p = genListOfNodes(tree1) #findLeavesTree(tree1) # Tree1 is the fingerprint. Only leaves.
 	q = genListOfNodes(tree2) #findLeavesTree(tree2) # Second list
 	# TODO: I altered the above, because I think we may need to do this on all nodes instead of just the leaves.
-	# 
 	kl_distance_sum = 0
 	counter = 0
-	
+
 	for node_item in p:
 		qi_prob = findNodeProbabilityInList(node_item, q)
 		if qi_prob == -1:
@@ -568,7 +564,7 @@ def calculateKLDistance(tree1, tree2, factor=0.5):
 #===============================================================================
 # checkTreeShapeDiff is the second of our home-made algorithms. It attempts to find
 # similarity in the tree shapes. The result is a tuple. The first is a boolean stating if
-# the trees are identical. The second lists the number of mismatches found. 
+# the trees are identical. The second lists the number of mismatches found.
 # TODO: Normalize the number
 #===============================================================================
 def checkTreeShapeDiff(tree1,tree2):
@@ -593,15 +589,19 @@ def checkTreeShapeDiff(tree1,tree2):
 					# Root1 has more children so subtree_sum up all of tree1's subtrees
 					subtree_sum += 1+ (tree1.sub_tree[i][0]).sub_tree_size
 		return (t_or_f==True, subtree_sum)
-	
-		
+
+
+#===============================================================================
+# quantDist returns the quantization distance (normalized) between two codebook values
+# (for instance, between 'a' and 'e')
+#===============================================================================
 def quantDist(left, right): # Always between 0 and 1, unless error: then -1.
 	try:
 		entirerange = codebook[-1]-codebook[0]
 		return abs(codebook[ ord(left)-97 ] - codebook[ ord(right)-97 ])/entirerange # Quantization distance is the distance between two centroids
 	except IndexError:
 		print("l: %s r: %s not found" %(left,right))
-		return 1		
+		return 1
 
 
 
@@ -609,7 +609,7 @@ def quantDist(left, right): # Always between 0 and 1, unless error: then -1.
 ###  1. Normalize the values ('average' them out so that they total 1 per level
 ###  3. Check obviously. Verify results
 ###  4. Build some sort of testing framework - so that we can run many tests at once with varying vlaues of factors and length of files and so on.
-###  5. UI - to make things look nice. 
+###  5. UI - to make things look nice.
 ###  6. Find string in tree   - ????
 
 
@@ -626,33 +626,33 @@ def compareLevels(tree1, tree2, level):
 	return total
 
 #===============================================================================
-# compare node from tree1 with all the level nodes of tree2 
-#
+# compareNodeToLevel compare node from tree1 with all the level nodes of tree2
 #===============================================================================
 def compareNodeToLevel (nodeTree1, tree2, level):
 	smallest = 1
 	levelNodes = getNodeNamesInLevel(tree2, level)
 	for node in levelNodes:
 		smallest = min(smallest,quantDist(nodeTree1[-1], node[-1]))				#compare all nodes in level with node from tree1 and get the smallest
-	return smallest	
+	return smallest
 
 #===============================================================================
-# returns list of nodes name in level
+# getNodeNamesInLevel returns list of node names in a specific level
 #===============================================================================
 def getNodeNamesInLevel(root, level):
-	l = [ findLevel(son, level) for son in root.sub_tree ]
+	l = [ getNodeNamesInLevel1(son, level) for son in root.sub_tree ]
 	return flatten(l)
+
 #===============================================================================
-# used by getNodeNamesInLevel to find nodes in level
+# used by getNodeNamesInLevel to find all nodes in level
 #===============================================================================
-def findLevel(node_tuple, level):
+def getNodeNamesInLevel1(node_tuple, level):
 	if len(node_tuple[0].name) == level:
 		return node_tuple[0].name
 	else:
 		return getNodeNamesInLevel(node_tuple[0], level)
-	
+
 #===============================================================================
-# compare tree1 to tree2 quant distance.
+# compare tree1 to tree2 quantization distance.
 # return distance between 0 and 1
 #===============================================================================
 def compareTreesByLevel(tree1, tree2):
@@ -666,20 +666,23 @@ def compareTreesByLevel(tree1, tree2):
 
 
 #===============================================================================
-# returns list of nodes name in level
+#  getNodesInLevel returns list of nodes name in level
 #===============================================================================
 def getNodesInLevel(root, level):
-	l = [ findLevel2(son, level) for son in root.sub_tree ]
+	l = [ getNodesInLevel1(son, level) for son in root.sub_tree ]
 	return flatten(l)
 #===============================================================================
 # used by getNodesInLevel to find nodes in level
 #===============================================================================
-def findLevel2(node_tuple, level):
+def getNodesInLevel1(node_tuple, level):
 	if len(node_tuple[0].name) == level:
 		return node_tuple[0]
 	else:
 		return getNodesInLevel(node_tuple[0], level)
 
+#===============================================================================
+# llfun - Calculates log-loss
+#===============================================================================
 def llfun(act, pred):
 	epsilon = 1e-15
 	pred = sp.maximum(epsilon, pred)
@@ -688,6 +691,10 @@ def llfun(act, pred):
 	ll = ll * -1.0/len(act)
 	return ll
 
+#===============================================================================
+# compareFingerprintWithLZListLL Compares a fingerprint with a capture (lempel-ziv'd)
+# and returns the Log-Loss value
+#===============================================================================
 def compareFingerprintWithLZListLL(fp, lzlist):
 	totalLogLoss = 0
 	lzlist = sorted(lzlist)
@@ -696,7 +703,7 @@ def compareFingerprintWithLZListLL(fp, lzlist):
 		nodeProb = findTagProbabilityInList(listElem,levelElements)
 		print ("Looking for %s in list %s."%(listElem,levelElements))
 		#totalLogLoss += llfun(
-		#					[codebook[ord(listElem)-97]] 
+		#					[codebook[ord(listElem)-97]]
 		#					, nodeProb)
 		epsilon = 1e-15
 		pred = sp.maximum(epsilon, nodeProb)
@@ -709,7 +716,9 @@ def compareFingerprintWithLZListLL(fp, lzlist):
 		print ("New Logloss is %f"%(totalLogLoss))
 	return totalLogLoss
 
-
+#===============================================================================
+# findMaxProbOfNode finds the node with maximum probability in the subtree
+#===============================================================================
 def findMaxProbOfNode(node):
 	largest=0
 	for son in node.sub_tree:
@@ -717,7 +726,11 @@ def findMaxProbOfNode(node):
 			largest = son[1].prob
 			tag = son[0].name
 	return tag
-	
+
+#===============================================================================
+# compareFingerprintWithLZListHL compares a fingerprint with a capture (lempel ziv'd)
+# according to the Hamming Loss method.
+#===============================================================================
 def compareFingerprintWithLZListHL(fp, window, lzlist):
 	# Find last entry inducted into the LZ List from the window
 	for i in range(len(window)):
@@ -739,6 +752,10 @@ def compareFingerprintWithLZListHL(fp, window, lzlist):
 			return estimateTag[-1]
 
 
+#===============================================================================
+# compareFingerprintWithCapture wrapper function that performs two tests:
+# Log loss and Hamming loss, for a sepcific fingerprint and a captured string
+#===============================================================================
 def compareFingerprintWithCapture(fp,capturedQuantizedString,windowSize=8):
 	hammingResultVec = []
 	hashmap2 = {}
@@ -758,7 +775,7 @@ def compareFingerprintWithCapture(fp,capturedQuantizedString,windowSize=8):
 		else:
 			if(result<smallest):
 				smallest = result
-		print("Result %f"%result)			
+		print("Result %f"%result)
 		# Algo2
 		estimatedTag = compareFingerprintWithLZListHL(fp, window, hashmap2)
 		if i+windowSize+1 <= len(capturedQuantizedString):
@@ -775,6 +792,9 @@ def compareFingerprintWithCapture(fp,capturedQuantizedString,windowSize=8):
 			return (smallest,minHammingWindow(hammingResultVec,windowSize))
 	return (smallest,minHammingWindow(hammingResultVec,windowSize))
 
+#===============================================================================
+# minHammingWindow calculates the minimal Hamming Loss found in a sequence of hamming windows
+#===============================================================================
 def minHammingWindow(hammingResultVec, windowSize=8):
 	minHamming = 1
 	runTimes = len(hammingResultVec)-windowSize+1
@@ -784,19 +804,19 @@ def minHammingWindow(hammingResultVec, windowSize=8):
 		minHamming = min(vecSum, minHamming)
 	print ("minHamming is %f"%minHamming)
 	return minHamming
-	
+
 
 #===============================================================================
 # training looks in a directory list (should be specified), and for each directory
 # it scans the PCAP files and collects timestamps. Afterwards, it runs
-# the LloydMax generator method, and sets decisiou boundaries. 
+# the LloydMax generator method, and sets decisiou boundaries.
 # The second parameter in the function is the size of the codebook. (Default: 8)
 #===============================================================================
 def training(dir_list = ['training_1'], codebook_size = 8):
 	for wd in dir_list:
 		findAllPcapFiles(wd) # Get list of pcap files
 		collectAllRelativeTimestamps(wd)
-		
+
 	createLloydMaxCodebook(codebook_size) # Create code book
 	codebook.sort() # Sort the code book
 	# Find decision boundaries
@@ -805,7 +825,10 @@ def training(dir_list = ['training_1'], codebook_size = 8):
 	while i<len(codebook):
 		decision_boundaries.append((codebook[i]+codebook[i-1])*0.5)
 		i+=1
-		
+	for file in file_list: # Add fingerprints to database
+		t = generateTreeFromString(parsePcapAndGetQuantizedString(file,1000))
+		filename = (file.split('\\')[-1]).split('.')[0]
+		database.append(fingerprint(filename,t))
 
 #===============================================================================
 # showQuantizations attempts to graph the quantization steps nicely.
@@ -821,12 +844,12 @@ def showQuantizations():
 	fig = pl.figure()
 	ax = fig.add_subplot(111)
 	pl.title('Codebook quantization values', fontdict=font)
-	
+
 	transOffset = offset_copy(ax.transData, fig=fig, x = 0.08, y=-0.20, units='inches')
 	for x, y in zip(X, codebook):
 		pl.plot((x,),(y,), 'ro')
 		pl.text(x, y, ('%2.4f' % y), transform=transOffset)
-	
+
 	# You can specify a rotation for the tick labels in degrees or with keywords.
 	pl.xlabel('Quantized value')
 	pl.xticks(X, labels)
@@ -847,7 +870,7 @@ def trainingCallback():
 		tkc.statusString.set("You haven't picked any directories")
 		return
 	clearGlobals()
-	items = map(int,tkc.directorylb.curselection())	
+	items = map(int,tkc.directorylb.curselection())
 	l = []
 	for i in items:
 		l.append(list_of_dirs[i]) #.replace('/','\\'))
@@ -874,16 +897,11 @@ def showHistogram():
 	pl.autoscale(True, 'both')
 	pl.show()
 
-	
+
 def showGraphCallback():
-	t0=(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',1000)))
-	t1=(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'test',1000)))
-	t2=(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_FULL.pcap",'test',1000)))
-	
-	printTreeForWolfram(t0, "t0")
-	printTreeForWolfram(t1, "t1")
-	printTreeForWolfram(t2, "t2")
-	#printTreeWithNetworkX(t)
+	for dbi in database:
+		printTreeForWolfram(dbi.tree, dbi.tag)
+
 
 def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor=0.5 ):
 	(_tf,tsd) = checkTreeShapeDiff(fingerprint, testSubject)
@@ -891,7 +909,7 @@ def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor
 	kld = abs(calculateKLDistance(fingerprint, testSubject, kldFactor))
 	ctbl = compareTreesByLevel(fingerprint, testSubject)
 	return (weights[0]*tsd+weights[1]*kld+weights[2]*ctbl)
-	
+
 
 '''def testCallback():
 	global tkc
@@ -911,14 +929,14 @@ def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor
 	tstr += "Decision Boundaries %s\n\n"%decision_boundaries
 	for i in range(len(t)):
 		for j in range(len(t)):
-			if j != i:			
+			if j != i:
 				tstr += ("===Tree %s vs %s===\n"%(tnames[i],tnames[j]))
 				(tf,val) = (checkTreeShapeDiff(t[i], t[j]))
 				val=val/t[i].sub_tree_size
 				tstr += ("Tree-shape: \t\t\t(%s,%s)\n")%(tf,val)
 				tstr += ("Tree-distance (k=0.05):\t%f \n")%(calculateKLDistance(t[i], t[j], 0.05))
 				ctbl = compareTreesByLevel(t[i], t[j])
-				if(ctbl==0.0): 
+				if(ctbl==0.0):
 					ts = "<-- MATCH"
 				else:
 					ts = ""
@@ -926,12 +944,30 @@ def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor
 				tstr += ("\n=================\n")
 	tkc.tb.insert(tkinter.INSERT,tstr)'''
 
+
+#===============================================================================
+# findFpByTag Locate a fingerprint by its tag. Return false if not found.
+#===============================================================================
+def findFpByTag(tag):
+	for dbi in database:
+		if dbi.tag==tag:
+			return dbi.tree
+	return False
+
 def testCallback():
 	global tkc
-	fp = generateTreeFromString(parsePcapAndGetQuantizedString("skyp.pcap",'training_1',1000))
-	capturestring = parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2.pcap",'test',5000)
-	f,l = compareFingerprintWithCapture(fp,capturestring,15)
-	tstr = "The result for #1 was %f %s"%(f,l)
+	capturestring = parsePcapAndGetQuantizedString("bbc1.pcap",5000,'pcaps')
+	capturetree = generateTreeFromString(capturestring)
+	tstr=""
+	for dbi in database:
+		f,l = compareFingerprintWithCapture(dbi.tree,capturestring,15)
+		tstr += "Comparing %s fingerprint, resulted in:\n\tLog loss %f\n\tHamming Loss %f\n\t"%(dbi.tag,f,l)
+		(tf,val) = (checkTreeShapeDiff(dbi.tree, capturetree))
+		val=val/dbi.tree.sub_tree_size
+		tstr += ("Tree-shape: (%s,%s)\n\t")%(tf,val)
+		tstr += ("Tree-distance (k=0.05): %f\n\t")%(calculateKLDistance(dbi.tree, capturetree, 0.05))
+		ctbl = compareTreesByLevel(dbi.tree, capturetree)
+		tstr += ("Tree compareByLevel: %f \n\n")%(ctbl)
 	tkc.tb.insert(tkinter.INSERT,tstr)
 
 #===============================================================================
@@ -947,7 +983,7 @@ if __name__ == "__main__":
 	i=0
 	scrollbar = tkinter.Scrollbar(tkc.window)
 	tkc.directorylb.config(yscrollcommand=scrollbar.set)
-	
+
 	for x in os.walk('.'):
 		if not "git" in x[0] and not "prerequisites" in x[0] and not ".eclipse" in x[0]:
 			list_of_dirs.append(x[0][2:])
@@ -960,10 +996,8 @@ if __name__ == "__main__":
 	tkc.sb.grid(row=2, column=3, sticky=tkinter.W)#pack(side=tkinter.TOP)
 
 	scrollbar.config(command=tkc.directorylb.yview)
-	
-	
+
 	tkinter.Button(tkc.window, text="Start Training", command=trainingCallback).grid(row=3,columnspan=4)#pack(side=tkinter.BOTTOM)
 	tkinter.Label(tkc.window,textvariable=tkc.statusString,font=("Arial", 16),fg="#000080").grid(row=4,columnspan=4)# pack()
 	tkc.statusString.set("Ready...")
 	tkinter.mainloop()
-	
