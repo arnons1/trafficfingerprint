@@ -910,41 +910,6 @@ def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor
 	ctbl = compareTreesByLevel(fingerprint, testSubject)
 	return (weights[0]*tsd+weights[1]*kld+weights[2]*ctbl)
 
-
-'''def testCallback():
-	global tkc
-	t = []
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion.pcap",'test',1000)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_with_more.pcap",'test',1000)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("Internet Bank Phishing - ActiveX_kerogod-godlion_FULL.pcap",'test',1000)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_4_repaired.pcap",'test',1000)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_5_repaired.pcap",'test',1000)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker_dns_tcp_2.pcap",'test',1000)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("cryptlocker3_gamma_290114-18_14_06.pcap",'test',1000)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("NetSprint_Toolbar_ActiveX_toolbar.dll_Denial_of_Service_POC.pcap",'test',1000)))
-	t.append(generateTreeFromString(parsePcapAndGetQuantizedString("tbot_2E1814CCCF0C3BB2CC32E0A0671C0891.pcap",'test',1000)))
-	tnames = ["Kerogod fingerprint","Kerogod capture","Kerogod full capture (noisy)","Cryptlocker 1 fingerprint","Cryptlocker 2 fingerprint","Cryptlocker (noisy)","Cryptlocker (many, noisy)","Netsprint DOS malware","tbot capture (noisy)"]
-	tstr = ""
-	tstr += "Centroids: %s\n"%codebook
-	tstr += "Decision Boundaries %s\n\n"%decision_boundaries
-	for i in range(len(t)):
-		for j in range(len(t)):
-			if j != i:
-				tstr += ("===Tree %s vs %s===\n"%(tnames[i],tnames[j]))
-				(tf,val) = (checkTreeShapeDiff(t[i], t[j]))
-				val=val/t[i].sub_tree_size
-				tstr += ("Tree-shape: \t\t\t(%s,%s)\n")%(tf,val)
-				tstr += ("Tree-distance (k=0.05):\t%f \n")%(calculateKLDistance(t[i], t[j], 0.05))
-				ctbl = compareTreesByLevel(t[i], t[j])
-				if(ctbl==0.0):
-					ts = "<-- MATCH"
-				else:
-					ts = ""
-				tstr += ("Tree compareByLevel: \t\t%f %s\n")%(ctbl , ts)
-				tstr += ("\n=================\n")
-	tkc.tb.insert(tkinter.INSERT,tstr)'''
-
-
 #===============================================================================
 # findFpByTag Locate a fingerprint by its tag. Return false if not found.
 #===============================================================================
@@ -958,7 +923,9 @@ def testCallback():
 	global tkc
 	capturestring = parsePcapAndGetQuantizedString("bbc1.pcap",5000,'pcaps')
 	capturetree = generateTreeFromString(capturestring)
-	tstr=""
+	tstr = ""
+	tstr += "Centroids: %s\n==========================\n"%codebook
+	tstr += "Decision Boundaries: %s\n==========================\n"%decision_boundaries
 	for dbi in database:
 		f,l = compareFingerprintWithCapture(dbi.tree,capturestring,15)
 		tstr += "Comparing %s fingerprint, resulted in:\n\tLog loss %f\n\tHamming Loss %f\n\t"%(dbi.tag,f,l)
