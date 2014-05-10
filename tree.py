@@ -15,15 +15,20 @@ from random import random, choice
 from copy import copy
 from sklearn.metrics import hamming_loss, log_loss
 
+### TODO:
+### 1. Create new training set with PCAPS with filter (tcp || dns) && !ipv6 && !(ip.addr==224.0.0.0/16)
+### 2. Choose PCAP to compare with - add to UI
+### 3.
 
-hashmap = {}
-observed_vector = []
-file_list = []
-codebook = []
+
+lzHashmap = {}
+observed_time_vector = []
+pcaps_filelist_for_training = []
+centroids = []
 decision_boundaries = []
 list_of_dirs = []
-isFirstTime = True
-database=[] # For storing the fingerprints
+is_first_time = True
+fp_db=[] # For storing the fingerprints
 
 #===============================================================================
 # node is a tree node. It contains a name, probability and a list of sons
@@ -56,16 +61,16 @@ class fingerprint:
 class tkstuff:
 	def __init__(self, codebook_default="8"):
 		self.window = tkinter.Tk() # Start up TK
-		self.directorylb = tkinter.Listbox(self.window, height=6, width=50, selectmode=tkinter.MULTIPLE)
+		self.directorylb = tkinter.Listbox(self.window, height=5, width=30, selectmode=tkinter.MULTIPLE)
 		self.statusString = tkinter.StringVar()
 		self.var = tkinter.StringVar(self.window) # Hack begins
 		self.sb = tkinter.Spinbox(self.window, from_=1, to=15,textvariable=self.var)
-		self.var.set("8") # Stupid dirty hack ends. Sets the default codebook value to 8.
+		self.var.set("8") # Stupid dirty hack ends. Sets the default centroids value to 8.
 		self.tb = tkst.ScrolledText(
  								master = self.window,
      							wrap   = tkinter.WORD,
-	 							width  = 80,
-		    	 				height = 20, font=("Courier New",10)
+	 							width  = 95,
+		    	 				height = 18, font=("Courier New",10)
 		    	 				)
 
 #======================================== KMEANS ++ ===============================================
@@ -145,10 +150,10 @@ def lloyd(points, nclusters):
 #======================================== KMEANS ++ ===============================================
 
 def clearGlobals():
-	hashmap.clear()
-	observed_vector.clear()
-	#file_list.clear()
-	codebook.clear()
+	lzHashmap.clear()
+	observed_time_vector.clear()
+	#pcaps_filelist_for_training.clear()
+	centroids.clear()
 	decision_boundaries.clear()
 	#list_of_dirs.clear()
 
@@ -156,10 +161,10 @@ def clearGlobals():
 # generateTreeFromString generates a tree from string obviously
 #===============================================================================
 def generateTreeFromString(string):
-	global hashmap
-	hashmap.clear()
-	hashmap = getLZList(string, hashmap)  # Generates a hashtable for all variants, stored in 'hashmap'
-	l = sorted(hashmap)  # Sort hashmap and get it as a nice list
+	global lzHashmap
+	lzHashmap.clear()
+	lzHashmap = getLZList(string, lzHashmap)  # Generates a hashtable for all variants, stored in 'lzHashmap'
+	l = sorted(lzHashmap)  # Sort lzHashmap and get it as a nice list
 	t = buildTree(l)  # Build a tree
 	setProbTree(t, countLeavesTree(t))  # Set the probability for the tree nodes
 	setProbEdgesTree(t)  # Set the probability for the tree edges
@@ -167,21 +172,21 @@ def generateTreeFromString(string):
 	return t
 
 #===============================================================================
-# Creates a Lempel Ziv style hashmap for a given string, of any alphabet
-# Stores result in a global variable called hashmap. Recursive method
+# Creates a Lempel Ziv style lzHashmap for a given string, of any alphabet
+# Stores result in a global variable called lzHashmap. Recursive method
 #===============================================================================
 def getLZListR(head, tail):
-	global hashmap
+	global lzHashmap
 	if len(tail) == 0 and len(head) == 0:  # Empty list
 		return
-	if head in hashmap:
-		hashmap[head] += 1  # This item exists. Add one to its counter
+	if head in lzHashmap:
+		lzHashmap[head] += 1  # This item exists. Add one to its counter
 		if len(tail) == 0:
 			return
 		else:  # And if this is not the final letter, try the next combination (recurse)
 			getLZListR(head + tail[0], tail[1:])
 	else:
-		hashmap[head] = 1  # Item wasn't in hashmap, so its brand new entry....
+		lzHashmap[head] = 1  # Item wasn't in lzHashmap, so its brand new entry....
 		if len(tail) == 0:
 			return  # No more letters to check
 		if len(tail) == 1:  # And there are still more letters to go, so recurse (only one more letter)
@@ -190,8 +195,8 @@ def getLZListR(head, tail):
 			getLZListR(tail[0], tail[1:])
 
 #===============================================================================
-# Creates a Lempel Ziv style hashmap for a given string, of any alphabet
-# Stores result in a global variable called hashmap. Iterative method
+# Creates a Lempel Ziv style lzHashmap for a given string, of any alphabet
+# Stores result in a global variable called lzHashmap. Iterative method
 #===============================================================================
 def getLZList(string,hashm={}):
 	flag = True
@@ -207,7 +212,7 @@ def getLZList(string,hashm={}):
 				return hashm
 			else:  # More letters to come
 				end += 1
-		else:  # Item isn't in hashmap
+		else:  # Item isn't in lzHashmap
 			hashm[tempstr] = 1  # New entry
 			if end == len(string):
 				flag = False
@@ -218,7 +223,7 @@ def getLZList(string,hashm={}):
 
 
 #===============================================================================
-# buildTree builds a tree given a sorted list of items (from the hashmap usually)
+# buildTree builds a tree given a sorted list of items (from the lzHashmap usually)
 #===============================================================================
 def buildTree(listToInsert):
 	root = node('root', 0, [])  # Create new root item with probability 0
@@ -416,24 +421,24 @@ def printTreeForWolfram(root, name, start=True, f=None):
 
 #===============================================================================
 # findAllPcapFiles creates a list of pcap files in the current directory, to
-# be stored in the global variable 'file_list'
+# be stored in the global variable 'pcaps_filelist_for_training'
 #===============================================================================
 def findAllPcapFiles(wd):
 	for file in os.listdir(os.path.join(getcwd(),wd)):
 		if file.endswith(".pcap"):
-			file_list.append(os.path.join(getcwd(),wd,file))
+			pcaps_filelist_for_training.append(os.path.join(getcwd(),wd,file))
 
 #===============================================================================
 # collectAllRelativeTimestamps calls collectRelativeTimestampsForSingleFile for
 # every file in the file list
 #===============================================================================
 def collectAllRelativeTimestamps(wd):
-	for file in file_list:
+	for file in pcaps_filelist_for_training:
 		collectRelativeTimestampsForSingleFile(file,wd)
 
 #===============================================================================
 # collectRelativeTimestampsForSingleFile generates relative time differences for a single file
-# Saved in global variable observed_vector
+# Saved in global variable observed_time_vector
 #===============================================================================
 def collectRelativeTimestampsForSingleFile(file,wd):
 	f = open(file, "rb") # Open file
@@ -443,28 +448,28 @@ def collectRelativeTimestampsForSingleFile(file,wd):
 	for ts, _buf in pcapReader:
 		frame_counter += 1
 		if frame_counter > 1 :
-			observed_vector.append(ts - last_time) # Calculate relative timestamp and save
+			observed_time_vector.append(ts - last_time) # Calculate relative timestamp and save
 		else:
-			observed_vector.append(0) # First frame should have 0 as a timestamp
+			observed_time_vector.append(0) # First frame should have 0 as a timestamp
 		last_time = ts
 	f.close()
 
 #===============================================================================
-# createLloydMaxCodebook creates a quantized vector, with "num_codes" codes in the codebook
-# based on the Lloyd Max Kmeans++ scheme. The data is based on the observed_vector
+# createLloydMaxCodebook creates a quantized vector, with "num_codes" codes in the centroids
+# based on the Lloyd Max Kmeans++ scheme. The data is based on the observed_time_vector
 # observation vector.
 #===============================================================================
 def createLloydMaxCodebook(num_codes):
 	listOfPoints = []
-	for obsitem in observed_vector:
+	for obsitem in observed_time_vector:
 		listOfPoints.append(Point(obsitem,0.0)) # 1D K-Means++ clustering, so Y value is 0
 	cluster_centers = lloyd(listOfPoints, num_codes)
 	for value in cluster_centers:
-		codebook.append(value.x) # Append centroid X value to the list
+		centroids.append(value.x) # Append centroid X value to the list
 
 
 #===============================================================================
-# getCodeFromCodebook gets a code for a specific value from the codebook. Returns a char
+# getCodeFromCodebook gets a code for a specific value from the centroids. Returns a char
 # of the code to be used, ranging from 'a' to whatever the largest code is.
 #===============================================================================
 def getCodeFromCodebook(value):
@@ -558,7 +563,7 @@ def calculateKLDistance(tree1, tree2, factor=0.5):
 		if qi_prob == -1:
 			counter += 1
 			qi_prob = smoothKLContinuity(node_item.name, q) * factor
-		kl_distance_sum += (math.log(node_item.prob / qi_prob, len(codebook)) * node_item.prob) # Log with base len(codebook) (size of our alphabet)
+		kl_distance_sum += (math.log(node_item.prob / qi_prob, len(centroids)) * node_item.prob) # Log with base len(centroids) (size of our alphabet)
 	return kl_distance_sum
 
 #===============================================================================
@@ -592,13 +597,13 @@ def checkTreeShapeDiff(tree1,tree2):
 
 
 #===============================================================================
-# quantDist returns the quantization distance (normalized) between two codebook values
+# quantDist returns the quantization distance (normalized) between two centroids values
 # (for instance, between 'a' and 'e')
 #===============================================================================
 def quantDist(left, right): # Always between 0 and 1, unless error: then -1.
 	try:
-		entirerange = codebook[-1]-codebook[0]
-		return abs(codebook[ ord(left)-97 ] - codebook[ ord(right)-97 ])/entirerange # Quantization distance is the distance between two centroids
+		entirerange = centroids[-1]-centroids[0]
+		return abs(centroids[ ord(left)-97 ] - centroids[ ord(right)-97 ])/entirerange # Quantization distance is the distance between two centroids
 	except IndexError:
 		print("l: %s r: %s not found" %(left,right))
 		return 1
@@ -695,26 +700,22 @@ def llfun(act, pred):
 # compareFingerprintWithLZListLL Compares a fingerprint with a capture (lempel-ziv'd)
 # and returns the Log-Loss value
 #===============================================================================
-def compareFingerprintWithLZListLL(fp, lzlist):
+def compareFingerprintWithLZListLL(fp, lzlist, window_size):
 	totalLogLoss = 0
 	lzlist = sorted(lzlist)
 	for listElem in lzlist:
 		levelElements = getNodesInLevel(fp,len(listElem)) # Pull out the level from the fingerprint tree
 		nodeProb = findTagProbabilityInList(listElem,levelElements)
-		print ("Looking for %s in list %s."%(listElem,levelElements))
 		#totalLogLoss += llfun(
-		#					[codebook[ord(listElem)-97]]
+		#					[centroids[ord(listElem)-97]]
 		#					, nodeProb)
 		epsilon = 1e-15
 		pred = sp.maximum(epsilon, nodeProb)
 		pred = sp.minimum(1-epsilon, pred)
-		ll = log_loss([listElem],[[nodeProb,1-nodeProb]])
+		#ll = log_loss([listElem],[[nodeProb,1-nodeProb]])
 		ll2 = - math.log(pred)
-		if(ll!=ll2):
-			print("LL %f and LL2 %f aren't equal"%(ll,ll2))
-		totalLogLoss += ll
-		print ("New Logloss is %f"%(totalLogLoss))
-	return totalLogLoss
+		totalLogLoss += ll2
+	return -(totalLogLoss)/(window_size*math.log(epsilon))
 
 #===============================================================================
 # findMaxProbOfNode finds the node with maximum probability in the subtree
@@ -756,41 +757,41 @@ def compareFingerprintWithLZListHL(fp, window, lzlist):
 # compareFingerprintWithCapture wrapper function that performs two tests:
 # Log loss and Hamming loss, for a sepcific fingerprint and a captured string
 #===============================================================================
-def compareFingerprintWithCapture(fp,capturedQuantizedString,windowSize=8):
-	hammingResultVec = []
+def compareFingerprintWithCapture(fp,capturedQuantizedString,window_size=8):
+	hamming_result_vec = []
 	hashmap2 = {}
-	windowSize = min(windowSize,len(capturedQuantizedString)) # Just in case
-	runTimes = len(capturedQuantizedString)-windowSize+1 # Amount of times the loop will have to run
-	print("Runtimes %d"%(runTimes))
+	window_size = min(window_size,len(capturedQuantizedString)) # Just in case
+	runTimes = len(capturedQuantizedString)-window_size+1 # Amount of times the loop will have to run
+	counter=0
 	for i in range(runTimes):
-		window = capturedQuantizedString[i:i+windowSize]
-		print("#############window %s" %(window))
+		window = capturedQuantizedString[i:i+window_size]
 		# Algo1
 		hashmap2.clear()
-		hashmap2 = getLZList(window,hashmap2)  # Generates a hashtable for all variants, stored in 'hashmap'
-		print("=========> HM2 %s"%(hashmap2))
-		result = compareFingerprintWithLZListLL(fp, hashmap2)
+		hashmap2 = getLZList(window,hashmap2)  # Generates a hashtable for all variants, stored in 'lzHashmap'
+		result = compareFingerprintWithLZListLL(fp, hashmap2, window_size)
 		if 'smallest' not in locals():
 			smallest = result
 		else:
 			if(result<smallest):
 				smallest = result
-		print("Result %f"%result)
 		# Algo2
 		estimatedTag = compareFingerprintWithLZListHL(fp, window, hashmap2)
-		if i+windowSize+1 <= len(capturedQuantizedString):
+		if i+window_size+1 <= len(capturedQuantizedString):
 			estimatedWindow = window+estimatedTag
-			realWindow = capturedQuantizedString[i:i+windowSize+1]
-			print("Estimated window %s %s = %s"%(window,estimatedTag,estimatedWindow))
-			print("Real window %s"%(realWindow))
+			realWindow = capturedQuantizedString[i:i+window_size+1]
+			#if estimatedTag==realWindow[-1]:
+			#	s="<--- SUCCESS"
+			#	counter+=1
+			#else:
+			#	counter=0
+			#	s=""
+			#print("Counter: %d - Expected to see: %c. Actually saw %c  %s"%(counter,estimatedTag,realWindow[-1],s))
 			res = hamming_loss(list(realWindow),list(estimatedWindow))
-			print("Hamming result was %f"%(res))
-			hammingResultVec.append(res)
+			hamming_result_vec.append(res)
 		else:
 			# Do nothing. We've reached the end of the window and don't want to estimate any more.
-			print("Smallest is %f , hwindow is %f"%(smallest,minHammingWindow(hammingResultVec,windowSize)))
-			return (smallest,minHammingWindow(hammingResultVec,windowSize))
-	return (smallest,minHammingWindow(hammingResultVec,windowSize))
+			return (smallest,minHammingWindow(hamming_result_vec,window_size))
+	return (smallest,minHammingWindow(hamming_result_vec,window_size))
 
 #===============================================================================
 # minHammingWindow calculates the minimal Hamming Loss found in a sequence of hamming windows
@@ -802,7 +803,6 @@ def minHammingWindow(hammingResultVec, windowSize=8):
 		window = hammingResultVec[i:i+windowSize]
 		vecSum = sum(window)
 		minHamming = min(vecSum, minHamming)
-	print ("minHamming is %f"%minHamming)
 	return minHamming
 
 
@@ -810,7 +810,7 @@ def minHammingWindow(hammingResultVec, windowSize=8):
 # training looks in a directory list (should be specified), and for each directory
 # it scans the PCAP files and collects timestamps. Afterwards, it runs
 # the LloydMax generator method, and sets decisiou boundaries.
-# The second parameter in the function is the size of the codebook. (Default: 8)
+# The second parameter in the function is the size of the centroids. (Default: 8)
 #===============================================================================
 def training(dir_list = ['training_1'], codebook_size = 8):
 	for wd in dir_list:
@@ -818,23 +818,23 @@ def training(dir_list = ['training_1'], codebook_size = 8):
 		collectAllRelativeTimestamps(wd)
 
 	createLloydMaxCodebook(codebook_size) # Create code book
-	codebook.sort() # Sort the code book
+	centroids.sort() # Sort the code book
 	# Find decision boundaries
 	decision_boundaries.append(0) # Insert 0 as first boundary
 	i=1
-	while i<len(codebook):
-		decision_boundaries.append((codebook[i]+codebook[i-1])*0.5)
+	while i<len(centroids):
+		decision_boundaries.append((centroids[i]+centroids[i-1])*0.5)
 		i+=1
-	for file in file_list: # Add fingerprints to database
+	for file in pcaps_filelist_for_training: # Add fingerprints to fp_db
 		t = generateTreeFromString(parsePcapAndGetQuantizedString(file,1000))
 		filename = (file.split('\\')[-1]).split('.')[0]
-		database.append(fingerprint(filename,t))
+		fp_db.append(fingerprint(filename,t))
 
 #===============================================================================
 # showQuantizations attempts to graph the quantization steps nicely.
 #===============================================================================
 def showQuantizations():
-	X = range(len(codebook))
+	X = range(len(centroids))
 	labels = [ chr(97+val) for val in X ]
 	font = {'family' : 'serif',
         'color'  : 'darkred',
@@ -846,7 +846,7 @@ def showQuantizations():
 	pl.title('Codebook quantization values', fontdict=font)
 
 	transOffset = offset_copy(ax.transData, fig=fig, x = 0.08, y=-0.20, units='inches')
-	for x, y in zip(X, codebook):
+	for x, y in zip(X, centroids):
 		pl.plot((x,),(y,), 'ro')
 		pl.text(x, y, ('%2.4f' % y), transform=transOffset)
 
@@ -865,7 +865,7 @@ def showQuantizations():
 # the listbox selected directories and starts the training
 #===============================================================================
 def trainingCallback():
-	global isFirstTime, tkc
+	global is_first_time, tkc
 	if len(tkc.directorylb.curselection())<1:
 		tkc.statusString.set("You haven't picked any directories")
 		return
@@ -876,8 +876,8 @@ def trainingCallback():
 		l.append(list_of_dirs[i]) #.replace('/','\\'))
 	training(l,int(tkc.sb.get()))
 	tkc.statusString.set("Done training!")
-	if isFirstTime==True:
-		isFirstTime=False
+	if is_first_time==True:
+		is_first_time=False
 		tkinter.Button(tkc.window, text="  Show quantizations  ", command=showQuantizations).grid(row=5,column=0, columnspan=2, sticky=tkinter.W)
 		tkinter.Button(tkc.window, text="   Show histogram  ", command=showHistogram).grid(row=5,column=2, columnspan=2, sticky=tkinter.W)
 		tkinter.Button(tkc.window, text="Print tests to console ", command=testCallback).grid(row=6, column=0, columnspan=2, sticky=tkinter.W)
@@ -886,20 +886,20 @@ def trainingCallback():
 
 def showHistogram():
 	pl.figure()
-	pl.hist(observed_vector, codebook, normed=True, histtype='bar', rwidth=1)
-	X = range(len(codebook))
+	pl.hist(observed_time_vector, centroids, normed=True, histtype='bar', rwidth=1)
+	X = range(len(centroids))
 	labels = [ chr(97+val) for val in X ]
 	pl.xlabel('Interval')
-	pl.xticks(codebook, labels)
+	pl.xticks(centroids, labels)
 	pl.ylabel('Probability')
-	pl.title('Histogram\n Mean: '+"%.4f"%np.mean(observed_vector)+' Variance: '+"%.4f"%np.var(observed_vector))
+	pl.title('Histogram\n Mean: '+"%.4f"%np.mean(observed_time_vector)+' Variance: '+"%.4f"%np.var(observed_time_vector))
 	pl.grid(True)
 	pl.autoscale(True, 'both')
 	pl.show()
 
 
 def showGraphCallback():
-	for dbi in database:
+	for dbi in fp_db:
 		printTreeForWolfram(dbi.tree, dbi.tag)
 
 
@@ -914,20 +914,22 @@ def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor
 # findFpByTag Locate a fingerprint by its tag. Return false if not found.
 #===============================================================================
 def findFpByTag(tag):
-	for dbi in database:
+	for dbi in fp_db:
 		if dbi.tag==tag:
 			return dbi.tree
 	return False
 
 def testCallback():
 	global tkc
-	capturestring = parsePcapAndGetQuantizedString("bbc1.pcap",5000,'pcaps')
+	capturestring = parsePcapAndGetQuantizedString("Cryptlocker_Delta.pcap",5000,'test')
 	capturetree = generateTreeFromString(capturestring)
 	tstr = ""
-	tstr += "Centroids: %s\n==========================\n"%codebook
+	tstr += "centroids: %s\n==========================\n"%centroids
 	tstr += "Decision Boundaries: %s\n==========================\n"%decision_boundaries
-	for dbi in database:
-		f,l = compareFingerprintWithCapture(dbi.tree,capturestring,15)
+	for dbi in fp_db:
+		window_size = dbi.tree.sub_tree_size
+		print ("Window size for %s is %d"%(dbi.tag,dbi.tree.sub_tree_size))
+		f,l = compareFingerprintWithCapture(dbi.tree,capturestring,window_size)
 		tstr += "Comparing %s fingerprint, resulted in:\n\tLog loss %f\n\tHamming Loss %f\n\t"%(dbi.tag,f,l)
 		(tf,val) = (checkTreeShapeDiff(dbi.tree, capturetree))
 		val=val/dbi.tree.sub_tree_size
@@ -944,7 +946,7 @@ if __name__ == "__main__":
 	global tkc
 	tkc = tkstuff()
 	tkc.window.title("Traffic Fingerprinting")
-	tkc.window.geometry("700x600")
+	tkc.window.geometry("800x600")
 	tkc.window.wm_iconbitmap('fingerprint.ico')
 	tkinter.Label(tkc.window,text="Pick directories to perform training on from below: ").grid(row=0, column=0, columnspan=4, sticky=tkinter.W+tkinter.E)
 	i=0
@@ -952,14 +954,14 @@ if __name__ == "__main__":
 	tkc.directorylb.config(yscrollcommand=scrollbar.set)
 
 	for x in os.walk('.'):
-		if not "git" in x[0] and not "prerequisites" in x[0] and not ".eclipse" in x[0]:
+		if not "git" in x[0] and not "prerequisites" in x[0] and not ".eclipse" in x[0] and not "_pycache_" in x[0]:
 			list_of_dirs.append(x[0][2:])
 			tkc.directorylb.insert(i,x[0][2:])
 			i+=1
-	tkc.directorylb.grid(row=1, column=1, columnspan=3, padx=5)#pack(side=tkinter.TOP)
+	tkc.directorylb.grid(row=1, column=1, columnspan=2, padx=2)#pack(side=tkinter.TOP)
 	scrollbar.grid(row=1,column=0, sticky=tkinter.N+tkinter.S)
 	tkinter.Label(tkc.window,text="Codebook size ",font=("Arial", 12),fg="#008000").grid(row=2,column=0, columnspan=3, sticky=tkinter.E)#pack(side=tkinter.TOP)
-	tkc.sb.config(width=5)
+	tkc.sb.config(width=4)
 	tkc.sb.grid(row=2, column=3, sticky=tkinter.W)#pack(side=tkinter.TOP)
 
 	scrollbar.config(command=tkc.directorylb.yview)
