@@ -59,19 +59,35 @@ class fingerprint:
 #===============================================================================
 
 class tkstuff:
-	def __init__(self, codebook_default="8"):
+	def __init__(self, optionList=[], codebook_default="8"):
 		self.window = tkinter.Tk() # Start up TK
+		# Directory listbox
 		self.directorylb = tkinter.Listbox(self.window, height=5, width=30, selectmode=tkinter.MULTIPLE)
+		
+		# Test dropdown
+		self.om_v = tkinter.StringVar()
+		self.om_v.set(optionList[0])
+		self.om = tkinter.OptionMenu(self.window, self.om_v, *optionList)
+		
 		self.statusString = tkinter.StringVar()
+		
+		# Spinbox for codebook size
 		self.var = tkinter.StringVar(self.window) # Hack begins
 		self.sb = tkinter.Spinbox(self.window, from_=1, to=15,textvariable=self.var)
-		self.var.set("8") # Stupid dirty hack ends. Sets the default centroids value to 8.
+		self.var.set(codebook_default) # Stupid dirty hack ends. Sets the default centroids value to 8.
+		# Textbox (console):
 		self.tb = tkst.ScrolledText(
  								master = self.window,
      							wrap   = tkinter.WORD,
 	 							width  = 95,
 		    	 				height = 18, font=("Courier New",10)
 		    	 				)
+		
+		self.histoIcon = tkinter.PhotoImage(file="icons/histogram.gif")
+		self.trainIcon = tkinter.PhotoImage(file="icons/train.gif")
+		self.quantIcon = tkinter.PhotoImage(file="icons/quantization.gif")
+		self.testIcon = tkinter.PhotoImage(file="icons/test.gif")
+		self.wolframIcon = tkinter.PhotoImage(file="icons/wolfram.gif")
 
 #======================================== KMEANS ++ ===============================================
 class Point:
@@ -420,27 +436,27 @@ def printTreeForWolfram(root, name, start=True, f=None):
 
 
 #===============================================================================
-# findAllPcapFiles creates a list of pcap files in the current directory, to
-# be stored in the global variable 'pcaps_filelist_for_training'
+# findAllPcapFiles creates a list of pcap files in the current directory
 #===============================================================================
-def findAllPcapFiles(wd):
+def findAllPcapFiles(wd, l=[]):
 	for file in os.listdir(os.path.join(getcwd(),wd)):
 		if file.endswith(".pcap"):
-			pcaps_filelist_for_training.append(os.path.join(getcwd(),wd,file))
+			l.append(os.path.join(getcwd(),wd,file))
+	return l
 
 #===============================================================================
 # collectAllRelativeTimestamps calls collectRelativeTimestampsForSingleFile for
 # every file in the file list
 #===============================================================================
-def collectAllRelativeTimestamps(wd):
-	for file in pcaps_filelist_for_training:
-		collectRelativeTimestampsForSingleFile(file,wd)
+def collectAllRelativeTimestamps(l):
+	for file in l:
+		collectRelativeTimestampsForSingleFile(file)
 
 #===============================================================================
 # collectRelativeTimestampsForSingleFile generates relative time differences for a single file
 # Saved in global variable observed_time_vector
 #===============================================================================
-def collectRelativeTimestampsForSingleFile(file,wd):
+def collectRelativeTimestampsForSingleFile(file):
 	f = open(file, "rb") # Open file
 	pcapReader = Reader(f) # Parse
 	frame_counter = 0
@@ -552,7 +568,7 @@ def smoothKLContinuity(itemname, node_list):
 # modified (smoothed) KL distance.
 #===============================================================================
 def calculateKLDistance(tree1, tree2, factor=0.5):
-	p = genListOfNodes(tree1) #findLeavesTree(tree1) # Tree1 is the fingerprint. Only leaves.
+	p = genListOfNodes(tree1) # Tree1 is the fingerprint. Only leaves.
 	q = genListOfNodes(tree2) #findLeavesTree(tree2) # Second list
 	# TODO: I altered the above, because I think we may need to do this on all nodes instead of just the leaves.
 	kl_distance_sum = 0
@@ -562,9 +578,9 @@ def calculateKLDistance(tree1, tree2, factor=0.5):
 		qi_prob = findNodeProbabilityInList(node_item, q)
 		if qi_prob == -1:
 			counter += 1
-			qi_prob = smoothKLContinuity(node_item.name, q) * factor
+			qi_prob = smoothKLContinuity(node_item.name, q)*1e-10
 		kl_distance_sum += (math.log(node_item.prob / qi_prob, len(centroids)) * node_item.prob) # Log with base len(centroids) (size of our alphabet)
-	return kl_distance_sum
+	return max(kl_distance_sum,0)
 
 #===============================================================================
 # checkTreeShapeDiff is the second of our home-made algorithms. It attempts to find
@@ -813,9 +829,11 @@ def minHammingWindow(hammingResultVec, windowSize=8):
 # The second parameter in the function is the size of the centroids. (Default: 8)
 #===============================================================================
 def training(dir_list = ['training_1'], codebook_size = 8):
+	global pcaps_filelist_for_training
+	pcaps_filelist_for_training.clear()
 	for wd in dir_list:
-		findAllPcapFiles(wd) # Get list of pcap files
-		collectAllRelativeTimestamps(wd)
+		pcaps_filelist_for_training = (findAllPcapFiles(wd, pcaps_filelist_for_training)) # Get list of pcap files
+	collectAllRelativeTimestamps(pcaps_filelist_for_training)
 
 	createLloydMaxCodebook(codebook_size) # Create code book
 	centroids.sort() # Sort the code book
@@ -878,11 +896,14 @@ def trainingCallback():
 	tkc.statusString.set("Done training!")
 	if is_first_time==True:
 		is_first_time=False
-		tkinter.Button(tkc.window, text="  Show quantizations  ", command=showQuantizations).grid(row=5,column=0, columnspan=2, sticky=tkinter.W)
-		tkinter.Button(tkc.window, text="   Show histogram  ", command=showHistogram).grid(row=5,column=2, columnspan=2, sticky=tkinter.W)
-		tkinter.Button(tkc.window, text="Print tests to console ", command=testCallback).grid(row=6, column=0, columnspan=2, sticky=tkinter.W)
-		tkinter.Button(tkc.window, text="Show sample graph", command=showGraphCallback).grid(row=6, column=2, columnspan=2, sticky=tkinter.W)
-		tkc.tb.grid(row=7,columnspan=6,rowspan=6, sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+		tkinter.Button(tkc.window, compound=tkinter.LEFT,image=tkc.quantIcon, text="  Show quantizations  ", command=showQuantizations).grid(row=5,column=0, columnspan=2, sticky=tkinter.W)
+		tkinter.Button(tkc.window, compound=tkinter.LEFT,image=tkc.histoIcon, text="   Show histogram  ", command=showHistogram).grid(row=5,column=2, columnspan=2, sticky=tkinter.W)
+		#tkinter.Button(tkc.window, text="Print tests to console ", command=testCallback).grid(row=6, column=0, columnspan=2, sticky=tkinter.W)
+		tkinter.Button(tkc.window, compound=tkinter.LEFT,image=tkc.wolframIcon, text="Show sample graph", command=showGraphCallback).grid(row=5, column=4, columnspan=2, sticky=tkinter.W)
+		tkinter.Label(tkc.window,text="Capture to compare against",font=("Arial", 11),fg="#008000").grid(row=7,column=0, columnspan=3, sticky=tkinter.N+tkinter.W)
+		tkc.om.grid(row=7,column=2,columnspan=2, rowspan=1, sticky=tkinter.W)
+		tkinter.Button(tkc.window,compound=tkinter.LEFT,image=tkc.testIcon,text=" Start comparison ", command=testCallback).grid(row=7, column=4,sticky=tkinter.W)
+		tkc.tb.grid(row=9,columnspan=6,rowspan=6, sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
 
 def showHistogram():
 	pl.figure()
@@ -897,11 +918,9 @@ def showHistogram():
 	pl.autoscale(True, 'both')
 	pl.show()
 
-
 def showGraphCallback():
 	for dbi in fp_db:
 		printTreeForWolfram(dbi.tree, dbi.tag)
-
 
 def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor=0.5 ):
 	(_tf,tsd) = checkTreeShapeDiff(fingerprint, testSubject)
@@ -921,22 +940,24 @@ def findFpByTag(tag):
 
 def testCallback():
 	global tkc
-	capturestring = parsePcapAndGetQuantizedString("Cryptlocker_Delta.pcap",5000,'test')
-	capturetree = generateTreeFromString(capturestring)
-	tstr = ""
-	tstr += "centroids: %s\n==========================\n"%centroids
+	fileToCompare = tkc.om_v.get()
+	capture_string = parsePcapAndGetQuantizedString(fileToCompare,5000,'test')
+	capture_tree = generateTreeFromString(capture_string)
+	tstr = "::"+fileToCompare+"::\n"
+	tstr += "Centroids: %s\n==========================\n"%centroids
 	tstr += "Decision Boundaries: %s\n==========================\n"%decision_boundaries
 	for dbi in fp_db:
-		window_size = dbi.tree.sub_tree_size
+		window_size = dbi.tree.sub_tree_size-1
 		print ("Window size for %s is %d"%(dbi.tag,dbi.tree.sub_tree_size))
-		f,l = compareFingerprintWithCapture(dbi.tree,capturestring,window_size)
+		f,l = compareFingerprintWithCapture(dbi.tree,capture_string,window_size)
 		tstr += "Comparing %s fingerprint, resulted in:\n\tLog loss %f\n\tHamming Loss %f\n\t"%(dbi.tag,f,l)
-		(tf,val) = (checkTreeShapeDiff(dbi.tree, capturetree))
+		(tf,val) = (checkTreeShapeDiff(dbi.tree, capture_tree))
 		val=val/dbi.tree.sub_tree_size
 		tstr += ("Tree-shape: (%s,%s)\n\t")%(tf,val)
-		tstr += ("Tree-distance (k=0.05): %f\n\t")%(calculateKLDistance(dbi.tree, capturetree, 0.05))
-		ctbl = compareTreesByLevel(dbi.tree, capturetree)
+		tstr += ("Tree-distance (k=0.05): %f\n\t")%(calculateKLDistance(dbi.tree, capture_tree, 0.05))
+		ctbl = compareTreesByLevel(dbi.tree, capture_tree)
 		tstr += ("Tree compareByLevel: %f \n\n")%(ctbl)
+	tkc.tb.delete(1.0, tkinter.END)
 	tkc.tb.insert(tkinter.INSERT,tstr)
 
 #===============================================================================
@@ -944,29 +965,30 @@ def testCallback():
 #===============================================================================
 if __name__ == "__main__":
 	global tkc
-	tkc = tkstuff()
+	
+	optionList = findAllPcapFiles('test')
+	for i in range(len(optionList)):
+		optionList[i] = optionList[i].split('\\')[-1]
+	
+	tkc = tkstuff(optionList)
 	tkc.window.title("Traffic Fingerprinting")
 	tkc.window.geometry("800x600")
-	tkc.window.wm_iconbitmap('fingerprint.ico')
+	tkc.window.wm_iconbitmap('icons/fingerprint.ico')
 	tkinter.Label(tkc.window,text="Pick directories to perform training on from below: ").grid(row=0, column=0, columnspan=4, sticky=tkinter.W+tkinter.E)
 	i=0
-	scrollbar = tkinter.Scrollbar(tkc.window)
-	tkc.directorylb.config(yscrollcommand=scrollbar.set)
-
 	for x in os.walk('.'):
-		if not "git" in x[0] and not "prerequisites" in x[0] and not ".eclipse" in x[0] and not "_pycache_" in x[0]:
+		if "training" in x[0]:
 			list_of_dirs.append(x[0][2:])
 			tkc.directorylb.insert(i,x[0][2:])
 			i+=1
 	tkc.directorylb.grid(row=1, column=1, columnspan=2, padx=2)#pack(side=tkinter.TOP)
-	scrollbar.grid(row=1,column=0, sticky=tkinter.N+tkinter.S)
-	tkinter.Label(tkc.window,text="Codebook size ",font=("Arial", 12),fg="#008000").grid(row=2,column=0, columnspan=3, sticky=tkinter.E)#pack(side=tkinter.TOP)
+	tkinter.Label(tkc.window,text="Codebook size ",font=("Arial", 11),fg="#008000").grid(row=2,column=0, columnspan=3, sticky=tkinter.E)#pack(side=tkinter.TOP)
 	tkc.sb.config(width=4)
 	tkc.sb.grid(row=2, column=3, sticky=tkinter.W)#pack(side=tkinter.TOP)
 
-	scrollbar.config(command=tkc.directorylb.yview)
-
-	tkinter.Button(tkc.window, text="Start Training", command=trainingCallback).grid(row=3,columnspan=4)#pack(side=tkinter.BOTTOM)
+	b = tkinter.Button(tkc.window,compound=tkinter.LEFT,image=tkc.trainIcon,text="Start Training" , command=trainingCallback)
+	b.grid(row=3,columnspan=4)#pack(side=tkinter.BOTTOM)
+	
 	tkinter.Label(tkc.window,textvariable=tkc.statusString,font=("Arial", 16),fg="#000080").grid(row=4,columnspan=4)# pack()
 	tkc.statusString.set("Ready...")
 	tkinter.mainloop()
