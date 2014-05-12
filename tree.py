@@ -844,7 +844,7 @@ def training(dir_list = ['training_1'], codebook_size = 8):
 		decision_boundaries.append((centroids[i]+centroids[i-1])*0.5)
 		i+=1
 	for file in pcaps_filelist_for_training: # Add fingerprints to fp_db
-		t = generateTreeFromString(parsePcapAndGetQuantizedString(file,1000))
+		t = generateTreeFromString(parsePcapAndGetQuantizedString(file,50))
 		filename = (file.split('\\')[-1]).split('.')[0]
 		fp_db.append(fingerprint(filename,t))
 
