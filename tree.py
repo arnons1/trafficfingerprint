@@ -4,7 +4,7 @@ from dpkt.pcap import Reader # Wireshark parsing
 import math
 import difflib # Finding closest strings
 from nt import getcwd # Get current working directory
-import tkinter # UI
+import tkinter as tk # UI
 import tkinter.scrolledtext as tkst
 import numpy as np # Number methods (average, median, stdev,...)
 import scipy as sp
@@ -14,6 +14,7 @@ import pylab # Graphs
 from random import random, choice
 from copy import copy
 from sklearn.metrics import hamming_loss, log_loss
+from time import sleep
 
 ### TODO:
 ### 1. Create new training set with PCAPS with filter (tcp || dns) && !ipv6 && !(ip.addr==224.0.0.0/16)
@@ -59,35 +60,49 @@ class fingerprint:
 #===============================================================================
 
 class tkstuff:
-	def __init__(self, optionList=[], codebook_default="8"):
-		self.window = tkinter.Tk() # Start up TK
+	def __init__(self, master, optionList=[], codebook_default="8"):
+		self.master=master
+		self.frame_1 = tk.Frame(self.master, bd=1, relief=tk.SUNKEN, width=600)#grid(row=0,column=0, columnspan=5)#pack(padx=5, pady=5)
+		self.frame_2 = tk.Frame(self.master, bd=1, relief=tk.SUNKEN, width=600)#grid(row=1,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
+		self.frame_3 = tk.Frame(self.master, bd=1, relief=tk.SUNKEN, width=600)#grid(row=2,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
+		self.frame_4 = tk.Frame(self.master, bd=1, relief=tk.SUNKEN, width=600)#grid(row=2,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
+		
 		# Directory listbox
-		self.directorylb = tkinter.Listbox(self.window, height=5, width=30, selectmode=tkinter.MULTIPLE)
+		self.directorylb = tk.Listbox(self.frame_1, height=5, width=30, selectmode=tk.MULTIPLE)
 		
 		# Test dropdown
-		self.om_v = tkinter.StringVar()
+		self.om_v = tk.StringVar()
 		self.om_v.set(optionList[0])
-		self.om = tkinter.OptionMenu(self.window, self.om_v, *optionList)
+		self.om = tk.OptionMenu(self.frame_2, self.om_v, *optionList)
 		
-		self.statusString = tkinter.StringVar()
+		self.statusString = tk.StringVar()
 		
 		# Spinbox for codebook size
-		self.var = tkinter.StringVar(self.window) # Hack begins
-		self.sb = tkinter.Spinbox(self.window, from_=1, to=15,textvariable=self.var)
+		self.var = tk.StringVar(self.frame_1) # Hack begins
+		self.sb = tk.Spinbox(self.frame_1, from_=1, to=15,textvariable=self.var)
 		self.var.set(codebook_default) # Stupid dirty hack ends. Sets the default centroids value to 8.
 		# Textbox (console):
 		self.tb = tkst.ScrolledText(
- 								master = self.window,
-     							wrap   = tkinter.WORD,
+ 								master = self.frame_3,
+     							wrap   = tk.WORD,
 	 							width  = 95,
 		    	 				height = 18, font=("Courier New",10)
 		    	 				)
 		
-		self.histoIcon = tkinter.PhotoImage(file="icons/histogram.gif")
-		self.trainIcon = tkinter.PhotoImage(file="icons/train.gif")
-		self.quantIcon = tkinter.PhotoImage(file="icons/quantization.gif")
-		self.testIcon = tkinter.PhotoImage(file="icons/test.gif")
-		self.wolframIcon = tkinter.PhotoImage(file="icons/wolfram.gif")
+		self.statusFontColor = "#00AA00" # Greenish
+		self.statusFontColorWorking = "#AAAA00" # Mustard colour
+		self.statusFontColorError = "#AA0000" # Reddish
+
+		self.statusLabel = tk.Label(self.frame_4,textvariable=self.statusString,font=("Arial", 14),fg=self.statusFontColor)
+		self.statusLabel.grid(row=0,column=1, columnspan=5, sticky=tk.N)
+		
+		self.histoIcon = tk.PhotoImage(file="icons/histogram.gif")
+		self.trainIcon = tk.PhotoImage(file="icons/train.gif")
+		self.quantIcon = tk.PhotoImage(file="icons/quantization.gif")
+		self.testIcon = tk.PhotoImage(file="icons/test.gif")
+		self.wolframIcon = tk.PhotoImage(file="icons/wolfram.gif")
+		self.csvIcon = tk.PhotoImage(file="icons/csv.gif")
+		
 
 #======================================== KMEANS ++ ===============================================
 class Point:
@@ -457,18 +472,23 @@ def collectAllRelativeTimestamps(l):
 # Saved in global variable observed_time_vector
 #===============================================================================
 def collectRelativeTimestampsForSingleFile(file):
+	global observed_time_vector
 	f = open(file, "rb") # Open file
 	pcapReader = Reader(f) # Parse
 	frame_counter = 0
 	last_time = 0
+	vec = []
 	for ts, _buf in pcapReader:
 		frame_counter += 1
 		if frame_counter > 1 :
-			observed_time_vector.append(ts - last_time) # Calculate relative timestamp and save
+			vec.append(ts - last_time) # Calculate relative timestamp and save
 		else:
-			observed_time_vector.append(0) # First frame should have 0 as a timestamp
+			vec.append(0) # First frame should have 0 as a timestamp
 		last_time = ts
 	f.close()
+	observed_time_vector+=vec
+	return vec
+	
 
 #===============================================================================
 # createLloydMaxCodebook creates a quantized vector, with "num_codes" codes in the centroids
@@ -476,6 +496,7 @@ def collectRelativeTimestampsForSingleFile(file):
 # observation vector.
 #===============================================================================
 def createLloydMaxCodebook(num_codes):
+	global observed_time_vector, centroids
 	listOfPoints = []
 	for obsitem in observed_time_vector:
 		listOfPoints.append(Point(obsitem,0.0)) # 1D K-Means++ clustering, so Y value is 0
@@ -878,13 +899,36 @@ def showQuantizations():
 	pl.subplots_adjust(bottom=0.15)
 	pl.show()
 
+def exportCSVs():
+	for file in pcaps_filelist_for_training:
+		filename = ((file.split('\\')[-1]).split('.')[0])
+		csvname = "fp_"+filename+".csv"
+		fp = open(os.path.join(getcwd(),"csv",csvname), "w")
+		joinAndWrite(centroids,fp,"centroids")
+		vec = collectRelativeTimestampsForSingleFile(file)
+		joinAndWrite(vec,fp,"relative_times")
+		vec = parsePcapAndGetQuantizedString(file)
+		joinAndWrite(vec,fp,"quantized_values")
+		fp.close()
+		
+def joinAndWrite(l,fp,linelead):
+	llen = len(l)
+	fp.write(linelead+",")
+	for i in range(llen):
+		fp.write("%s"%l[i])
+		if i<llen-1:
+			fp.write(",")
+		else:
+			fp.write("\n")
+		
 #===============================================================================
-# trainingCallback is the method called by tkinter to start the training. It gets
+# trainingCallback is the method called by tk to start the training. It gets
 # the listbox selected directories and starts the training
 #===============================================================================
 def trainingCallback():
 	global is_first_time, tkc
 	if len(tkc.directorylb.curselection())<1:
+		tkc.statusLabel.config(fg=tkc.statusFontColorError)
 		tkc.statusString.set("You haven't picked any directories")
 		return
 	clearGlobals()
@@ -893,17 +937,18 @@ def trainingCallback():
 	for i in items:
 		l.append(list_of_dirs[i]) #.replace('/','\\'))
 	training(l,int(tkc.sb.get()))
+	tkc.statusLabel.config(fg=tkc.statusFontColor)
 	tkc.statusString.set("Done training!")
 	if is_first_time==True:
 		is_first_time=False
-		tkinter.Button(tkc.window, compound=tkinter.LEFT,image=tkc.quantIcon, text="  Show quantizations  ", command=showQuantizations).grid(row=5,column=0, columnspan=2, sticky=tkinter.W)
-		tkinter.Button(tkc.window, compound=tkinter.LEFT,image=tkc.histoIcon, text="   Show histogram  ", command=showHistogram).grid(row=5,column=2, columnspan=2, sticky=tkinter.W)
-		#tkinter.Button(tkc.window, text="Print tests to console ", command=testCallback).grid(row=6, column=0, columnspan=2, sticky=tkinter.W)
-		tkinter.Button(tkc.window, compound=tkinter.LEFT,image=tkc.wolframIcon, text="Show sample graph", command=showGraphCallback).grid(row=5, column=4, columnspan=2, sticky=tkinter.W)
-		tkinter.Label(tkc.window,text="Capture to compare against",font=("Arial", 11),fg="#008000").grid(row=7,column=0, columnspan=3, sticky=tkinter.N+tkinter.W)
-		tkc.om.grid(row=7,column=2,columnspan=2, rowspan=1, sticky=tkinter.W)
-		tkinter.Button(tkc.window,compound=tkinter.LEFT,image=tkc.testIcon,text=" Start comparison ", command=testCallback).grid(row=7, column=4,sticky=tkinter.W)
-		tkc.tb.grid(row=9,columnspan=6,rowspan=6, sticky=tkinter.W+tkinter.E+tkinter.N+tkinter.S)
+		tk.Button(tkc.frame_1, compound=tk.LEFT,image=tkc.quantIcon,   text="   Show quantizations   ", command=showQuantizations).grid(row=0,column=8, rowspan=2, columnspan=2, sticky=tk.E)
+		tk.Button(tkc.frame_1, compound=tk.LEFT,image=tkc.histoIcon,   text="     Show histogram     ", command=showHistogram).grid(row=0,column=10, rowspan=2, columnspan=2, sticky=tk.E)
+		tk.Button(tkc.frame_1, compound=tk.LEFT,image=tkc.wolframIcon, text="   Fingerprint graphs    ", command=showGraphCallback).grid(row=1, rowspan=2, column=8, columnspan=2, sticky=tk.E+tk.S)
+		tk.Button(tkc.frame_1, compound=tk.LEFT,image=tkc.csvIcon,     text="Export fingerprint CSVs", command=exportCSVs).grid(row=1, rowspan=2, column=10, columnspan=2, sticky=tk.E+tk.S)
+		tk.Label(tkc.frame_2,text="Capture to compare against",font=("Arial", 11),fg="#008000").grid(row=0,column=0, columnspan=3, sticky=tk.N+tk.W)
+		tkc.om.grid(row=1,column=0,columnspan=5, rowspan=1, sticky=tk.W)
+		tk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Start comparison ", command=testCallback).grid(row=1, column=6,sticky=tk.W)
+		tkc.tb.pack(fill="both", expand=True, padx=20, pady=20)#grid(row=2,columnspan=6,rowspan=6, sticky=tk.W+tk.E+tk.N+tk.S)
 
 def showHistogram():
 	pl.figure()
@@ -940,6 +985,9 @@ def findFpByTag(tag):
 
 def testCallback():
 	global tkc
+	tkc.statusLabel.config(fg=tkc.statusFontColorWorking)
+	tkc.statusString.set("Working - Please wait...")
+	tkc.master
 	fileToCompare = tkc.om_v.get()
 	capture_string = parsePcapAndGetQuantizedString(fileToCompare,5000,'test')
 	capture_tree = generateTreeFromString(capture_string)
@@ -957,8 +1005,10 @@ def testCallback():
 		tstr += ("Tree-distance (k=0.05): %f\n\t")%(calculateKLDistance(dbi.tree, capture_tree, 0.05))
 		ctbl = compareTreesByLevel(dbi.tree, capture_tree)
 		tstr += ("Tree compareByLevel: %f \n\n")%(ctbl)
-	tkc.tb.delete(1.0, tkinter.END)
-	tkc.tb.insert(tkinter.INSERT,tstr)
+	tkc.tb.delete(1.0, tk.END)
+	tkc.tb.insert(tk.INSERT,tstr)
+	tkc.statusLabel.config(fg=tkc.statusFontColor)
+	tkc.statusString.set("Ready...")
 
 #===============================================================================
 # Main entry point into the program
@@ -969,26 +1019,32 @@ if __name__ == "__main__":
 	optionList = findAllPcapFiles('test')
 	for i in range(len(optionList)):
 		optionList[i] = optionList[i].split('\\')[-1]
-	
-	tkc = tkstuff(optionList)
-	tkc.window.title("Traffic Fingerprinting")
-	tkc.window.geometry("800x600")
-	tkc.window.wm_iconbitmap('icons/fingerprint.ico')
-	tkinter.Label(tkc.window,text="Pick directories to perform training on from below: ").grid(row=0, column=0, columnspan=4, sticky=tkinter.W+tkinter.E)
+	master = tk.Tk() # Start up TK
+	tkc = tkstuff(master,optionList)
+	tkc.master.title("Traffic Fingerprinting")
+	tkc.master.geometry("900x700")
+	tkc.master.wm_iconbitmap('icons/fingerprint.ico')
+	tk.Label(tkc.frame_1,text="Pick directories to perform training on from below: ").grid(row=0, column=0, columnspan=8, sticky=tk.W)
 	i=0
 	for x in os.walk('.'):
 		if "training" in x[0]:
 			list_of_dirs.append(x[0][2:])
 			tkc.directorylb.insert(i,x[0][2:])
 			i+=1
-	tkc.directorylb.grid(row=1, column=1, columnspan=2, padx=2)#pack(side=tkinter.TOP)
-	tkinter.Label(tkc.window,text="Codebook size ",font=("Arial", 11),fg="#008000").grid(row=2,column=0, columnspan=3, sticky=tkinter.E)#pack(side=tkinter.TOP)
-	tkc.sb.config(width=4)
-	tkc.sb.grid(row=2, column=3, sticky=tkinter.W)#pack(side=tkinter.TOP)
+	tkc.directorylb.grid(row=1, column=0, columnspan=2, padx=15, pady=3, sticky=tk.N)#pack(side=tk.TOP)
+	tk.Label(tkc.frame_1,text="Centroids ",font=("Arial", 11),fg="#008000").grid(row=1,column=3,padx=2,sticky=tk.E)
+	tkc.sb.config(width=3)
+	tkc.sb.grid(row=1, column=4,padx=2,sticky=tk.W)
 
-	b = tkinter.Button(tkc.window,compound=tkinter.LEFT,image=tkc.trainIcon,text="Start Training" , command=trainingCallback)
-	b.grid(row=3,columnspan=4)#pack(side=tkinter.BOTTOM)
+	b = tk.Button(tkc.frame_1,compound=tk.LEFT,image=tkc.trainIcon,text="Start Training" , command=trainingCallback)
+	b.grid(row=1,column=5,rowspan=2,columnspan=2,sticky=tk.W,padx=10)#pack(side=tk.BOTTOM)
 	
-	tkinter.Label(tkc.window,textvariable=tkc.statusString,font=("Arial", 16),fg="#000080").grid(row=4,columnspan=4)# pack()
+	tk.Label(tkc.frame_4,text="Status:",font=("Arial", 14),fg="#000000").grid(row=0, column=0, sticky=tk.N)
+	
 	tkc.statusString.set("Ready...")
-	tkinter.mainloop()
+	tk.Label(tkc.master,text="Traffic Fingerprint",font=("Arial", 16),fg="#000000").pack(padx=5, pady=5, anchor=tk.NW)
+	tkc.frame_1.pack(fill="x", expand=True, padx=5, pady=2,anchor=tk.N)
+	tkc.frame_2.pack(fill="x", expand=True, padx=5, pady=2)
+	tkc.frame_3.pack(fill="x", expand=True, padx=5, pady=2)
+	tkc.frame_4.pack(fill="x", expand=True, padx=5, pady=2,anchor=tk.S)
+	tkc.master.mainloop()
