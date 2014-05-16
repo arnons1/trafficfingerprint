@@ -200,6 +200,7 @@ def clearGlobals():
 	#pcaps_filelist_for_training.clear()
 	centroids.clear()
 	decision_boundaries.clear()
+	fp_db.clear()
 	#list_of_dirs.clear()
 
 #===============================================================================
@@ -809,35 +810,36 @@ def compareFingerprintWithLZListHL(fp, window, lzlist):
 # Log loss and Hamming loss, for a sepcific fingerprint and a captured string
 #===============================================================================
 def compareFingerprintWithCapture(fp,capturedQuantizedString,title="",window_size=8):
-	hamming_result_vec = []
+	hammingloss_result_vec = []
+	logloss_result_vec = []
 	hashmap2 = {}
 	window_size = min(window_size,len(capturedQuantizedString)) # Just in case
 	runTimes = len(capturedQuantizedString)-window_size+1 # Amount of times the loop will have to run
-	counter=0
 	for i in range(runTimes):
 		window = capturedQuantizedString[i:i+window_size]
-		# Algo1
+		# Algo1 (Log Loss)
 		hashmap2.clear()
 		hashmap2 = getLZList(window,hashmap2)  # Generates a hashtable for all variants, stored in 'lzHashmap'
-		result = compareFingerprintWithLZListLL(fp, hashmap2, window_size)
-		if 'smallest' not in locals():
-			smallest = result
-		else:
-			if(result<smallest):
-				smallest = result
-		# Algo2
+		logloss_result = compareFingerprintWithLZListLL(fp, hashmap2, window_size)
+		#if 'smallest' not in locals():
+			#smallest = logloss_result
+		#else:
+			#if(logloss_result<smallest):
+				#smallest = logloss_result
+		logloss_result_vec.append(logloss_result)
+		# Algo2 (Hamming Loss)
 		estimatedTag = compareFingerprintWithLZListHL(fp, window, hashmap2)
 		if i+window_size+1 <= len(capturedQuantizedString):
 			estimatedWindow = window+estimatedTag
 			realWindow = capturedQuantizedString[i:i+window_size+1]
-			res = hamming_loss(list(realWindow),list(estimatedWindow))
-			hamming_result_vec.append(res)
+			hammingloss_result_vec.append(hamming_loss(list(realWindow),list(estimatedWindow)))
 		else:
 			# Do nothing. We've reached the end of the window and don't want to estimate any more.
-			showHammingWindow(hamming_result_vec,title)
-			return (smallest,minHammingWindow(hamming_result_vec,window_size))
-	showHammingWindow(hamming_result_vec,title)
-	return (smallest,minHammingWindow(hamming_result_vec,window_size))
+			# showHammingWindow(hammingloss_result_vec,title)
+			#return (smallest,minHammingWindow(hammingloss_result_vec,window_size))
+			return (logloss_result_vec,hammingloss_result_vec)
+	# showHammingWindow(hammingloss_result_vec,title)
+	return (logloss_result_vec,hammingloss_result_vec)
 
 #===============================================================================
 # minHammingWindow calculates the minimal Hamming Loss found in a sequence of hamming windows
@@ -851,6 +853,29 @@ def minHammingWindow(hammingResultVec, windowSize=8):
 		minHamming = min(vecSum, minHamming)
 	return minHamming
 
+def movingAverageHammingWindow(hammingResultVec, windowSize=8):
+	res = []
+	runTimes = len(hammingResultVec)-windowSize+1
+	for i in range(runTimes):
+		window = hammingResultVec[i:i+windowSize]
+		res.append(sum(window))
+	return res
+
+#===============================================================================
+# printGraphForWolfram prints a graph from points to Wolfram
+#===============================================================================
+def printGraphForWolfram(l, file_name):
+	# Format:
+	# l = {0, 1, 0, 0, 0, 1, 1, 1, 0}; k = 
+	# MapThread[List, {Range[1, Length[l]], l}]; ListLinePlot[k]
+
+	f = open(file_name, 'w')
+	to_write = ",".join([ str(li) for li in l ])
+	s = "l={"+to_write+"}; k=MapThread[List, {Range[1, Length[l]], l}];\nListLinePlot[k,Filling->Axis,AxesLabel->Automatic,PlotRange->All]" 
+	f.write(s)
+	f.close()
+	call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", file_name])
+	
 def showHammingWindow(hamming_vec,title):
 	X = range(len(hamming_vec))
 	font = {'family' : 'serif',
@@ -858,8 +883,8 @@ def showHammingWindow(hamming_vec,title):
         'weight' : 'normal',
         'size'   : 16,
     }
-	pl.figure()
-	#ax = fig.add_subplot(111)
+	fig = pl.figure()
+	ax = fig.add_subplot(111)
 	pl.title('Hamming window for '+title, fontdict=font)
 
 	#transOffset = offset_copy(ax.transData, fig=fig, x = 0.08, y=-0.20, units='inches')
@@ -868,16 +893,17 @@ def showHammingWindow(hamming_vec,title):
 		#pl.text(x, y, ('%2.4f' % y), transform=transOffset)
 
 	# You can specify a rotation for the tick labels in degrees or with keywords.
-	pl.plot(X, hamming_vec, 'ro')
-	pl.axis([0, len(hamming_vec), 0, 1])
+	ax.plot(X, hamming_vec, 'ro')
+	# pl.axis([0, len(hamming_vec), 0, 1])
 
 	pl.xlabel('Packet')
 
 	# Pad margins so that markers don't get clipped by the axes
-	pylab.ylabel('Hamming Errors [Sec]')
-	pl.margins(0.2)
+	pl.ylabel('Hamming Errors [Sec]')
+	ax.margins(0.2)
 	# Tweak spacing to prevent clipping of tick-labels
 	pl.subplots_adjust(bottom=0.15)
+	ax.axis('auto')
 	pl.show()
 	
 #===============================================================================
@@ -949,14 +975,14 @@ def exportCSVs():
 		fp.close()
 		
 def joinAndWrite(l,fp,linelead):
-	llen = len(l)
-	fp.write(linelead+",")
-	for i in range(llen):
-		fp.write("%s"%l[i])
-		if i<llen-1:
-			fp.write(",")
-		else:
-			fp.write("\n")
+	to_write = ",".join([ str(li) for li in l ])
+	fp.write(linelead+","+to_write+"\n")
+	#for i in range(llen):
+		#fp.write("%s"%l[i])
+		#if i<llen-1:
+			#fp.write(",")
+		#else:
+			#fp.write("\n")
 		
 #===============================================================================
 # trainingCallback is the method called by tk to start the training. It gets
@@ -986,10 +1012,10 @@ def trainingCallback():
 		tkc.om_capture.grid(row=1,column=0,columnspan=5, rowspan=1, sticky=tk.W+tk.E)
 		tk.Label(tkc.frame_2,text="Fingerprint: ",font=("Arial", 11),fg="#008000").grid(row=0,column=5, columnspan=5, sticky=tk.N+tk.W)
 		tkc.om_fp.grid(row=1,column=5,columnspan=5, rowspan=1, sticky=tk.W+tk.E)
-		tk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Start ", command=testCallback).grid(row=1, column=10, columnspan=4 ,sticky=tk.E)
+		tk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Start ", command=testCallback).grid(row=1, column=10, columnspan=4, sticky=tk.E)
 		#tk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Hamming graphs ", command=showHammingGraphs).grid(row=1, column=7,sticky=tk.W)
 		tkc.tb.pack(fill="both", expand=True, padx=20, pady=20)#grid(row=2,columnspan=6,rowspan=6, sticky=tk.W+tk.E+tk.N+tk.S)
-		tkc.updateFingerprints([n.tag for n in fp_db])
+	tkc.updateFingerprints([n.tag for n in fp_db])
 
 def showHistogram():
 	pl.figure()
@@ -1021,7 +1047,7 @@ def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor
 def findFpByTag(tag):
 	for dbi in fp_db:
 		if dbi.tag==tag:
-			return dbi.tree
+			return dbi
 	return False
 
 def testCallback():
@@ -1030,24 +1056,29 @@ def testCallback():
 	tkc.statusString.set("Working - Please wait...")
 	tkc.master
 	fileToCompare = tkc.om_v_capture.get()
-	capture_string = parsePcapAndGetQuantizedString(fileToCompare,5000,'test')
+	fp = tkc.om_v_fp.get()
+	capture_string = parsePcapAndGetQuantizedString(fileToCompare,1000,'test')
 	capture_tree = generateTreeFromString(capture_string)
-	tstr = "::"+fileToCompare+"::\n"
+	tstr = "::Fingerprint: "+fp+" :::: Capture: "+fileToCompare+"::\n"
 	tstr += "Centroids: %s\n==========================\n"%centroids
 	tstr += "Decision Boundaries: %s\n==========================\n"%decision_boundaries
-	fpToCompare = tkc.om_v_fp.get()
+	dbi = findFpByTag(fp)
+	window_size = dbi.tree.sub_tree_size-1
+	print ("Window size for %s is %d"%(dbi.tag,dbi.tree.sub_tree_size))
+	f,l = compareFingerprintWithCapture(dbi.tree,capture_string,dbi.tag,window_size)
+
+	logloss_file_name = "logloss_"+fp+"_"+fileToCompare+".nb"
+	printGraphForWolfram(f,os.path.join(getcwd(),"wolfram_graphs",logloss_file_name)) 
+	hammingloss_file_name = "hammingloss_"+fp+"_"+fileToCompare+".nb"
+	printGraphForWolfram(l,os.path.join(getcwd(),"wolfram_graphs",hammingloss_file_name))
 	
-	for dbi in fp_db:
-		window_size = dbi.tree.sub_tree_size-1
-		print ("Window size for %s is %d"%(dbi.tag,dbi.tree.sub_tree_size))
-		f,l = compareFingerprintWithCapture(dbi.tree,capture_string,dbi.tag,window_size)
-		tstr += "Comparing %s fingerprint, resulted in:\n\tLog loss %f\n\tHamming Loss %f\n\t"%(dbi.tag,f,l)
-		(tf,val) = (checkTreeShapeDiff(dbi.tree, capture_tree))
-		val=val/dbi.tree.sub_tree_size
-		tstr += ("Tree-shape: (%s,%s)\n\t")%(tf,val)
-		tstr += ("Tree-distance (k=0.05): %f\n\t")%(calculateKLDistance(dbi.tree, capture_tree, 0.05))
-		ctbl = compareTreesByLevel(dbi.tree, capture_tree)
-		tstr += ("Tree compareByLevel: %f \n\n")%(ctbl)
+	tstr += "Comparing %s fingerprint, resulted in:\n"%(dbi.tag) #\tLog loss %f\n\tHamming Loss %f\n\t"%(dbi.tag,f,l)
+	(tf,val) = (checkTreeShapeDiff(dbi.tree, capture_tree))
+	val=val/dbi.tree.sub_tree_size
+	tstr += ("Tree-shape: (%s,%s)\n\t")%(tf,val)
+	tstr += ("Tree-distance (k=0.05): %f\n\t")%(calculateKLDistance(dbi.tree, capture_tree, 0.05))
+	ctbl = compareTreesByLevel(dbi.tree, capture_tree)
+	tstr += ("Tree compareByLevel: %f \n\n")%(ctbl)
 	tkc.tb.delete(1.0, tk.END)
 	tkc.tb.insert(tk.INSERT,tstr)
 	tkc.statusLabel.config(fg=tkc.statusFontColor)

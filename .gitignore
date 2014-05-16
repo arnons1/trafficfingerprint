@@ -1,6 +1,5 @@
 # Compiled source #
 ###################
-*.nb
 *.com
 *.class
 *.dll
@@ -26,6 +25,8 @@
 *.log
 *.sql
 *.sqlite
+*.csv
+*.nb
  
 # OS generated files #
 ######################
