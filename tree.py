@@ -13,8 +13,7 @@ import matplotlib.pyplot as pl # Graphs
 import pylab # Graphs
 from random import random, choice
 from copy import copy
-from sklearn.metrics import hamming_loss, log_loss
-from time import sleep
+from sklearn.metrics import hamming_loss
 
 ### TODO:
 ### 1. Create new training set with PCAPS with filter (tcp || dns) && !ipv6 && !(ip.addr==224.0.0.0/16)
@@ -62,18 +61,23 @@ class fingerprint:
 class tkstuff:
 	def __init__(self, master, optionList=[], codebook_default="8"):
 		self.master=master
-		self.frame_1 = tk.Frame(self.master, bd=1, relief=tk.SUNKEN, width=600)#grid(row=0,column=0, columnspan=5)#pack(padx=5, pady=5)
-		self.frame_2 = tk.Frame(self.master, bd=1, relief=tk.SUNKEN, width=600)#grid(row=1,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
-		self.frame_3 = tk.Frame(self.master, bd=1, relief=tk.SUNKEN, width=600)#grid(row=2,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
-		self.frame_4 = tk.Frame(self.master, bd=1, relief=tk.SUNKEN, width=600)#grid(row=2,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
+		self.frame_1 = tk.Frame(self.master, width=680)#grid(row=0,column=0, columnspan=5)#pack(padx=5, pady=5)
+		self.frame_2 = tk.Frame(self.master, width=680)#grid(row=1,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
+		self.frame_3 = tk.Frame(self.master, width=680)#grid(row=2,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
+		self.frame_4 = tk.Frame(self.master, width=680)#grid(row=2,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
 		
 		# Directory listbox
 		self.directorylb = tk.Listbox(self.frame_1, height=5, width=30, selectmode=tk.MULTIPLE)
 		
 		# Test dropdown
-		self.om_v = tk.StringVar()
-		self.om_v.set(optionList[0])
-		self.om = tk.OptionMenu(self.frame_2, self.om_v, *optionList)
+		self.om_v_capture = tk.StringVar()
+		self.om_v_capture.set(optionList[0])
+		self.om_capture = tk.OptionMenu(self.frame_2, self.om_v_capture, *optionList)
+		
+		self.om_v_fp = tk.StringVar()
+		self.ol2=['None']
+		self.om_v_fp.set(self.ol2[0])
+		self.om_fp = tk.OptionMenu(self.frame_2, self.om_v_fp, *self.ol2)
 		
 		self.statusString = tk.StringVar()
 		
@@ -102,6 +106,16 @@ class tkstuff:
 		self.testIcon = tk.PhotoImage(file="icons/test.gif")
 		self.wolframIcon = tk.PhotoImage(file="icons/wolfram.gif")
 		self.csvIcon = tk.PhotoImage(file="icons/csv.gif")
+
+	def updateFingerprints(self,optionList=[]):
+		self.om_v_fp.set('')
+		self.om_fp['menu'].delete(0, 'end')
+		# Insert list of new options (tk._setit hooks them up to var)
+		new_choices = optionList
+		for choice in new_choices:	
+			self.om_fp['menu'].add_command(label=choice, command=tk._setit(self.om_v_fp, choice))
+		self.om_v_fp.set(optionList[0])
+
 		
 
 #======================================== KMEANS ++ ===============================================
@@ -794,7 +808,7 @@ def compareFingerprintWithLZListHL(fp, window, lzlist):
 # compareFingerprintWithCapture wrapper function that performs two tests:
 # Log loss and Hamming loss, for a sepcific fingerprint and a captured string
 #===============================================================================
-def compareFingerprintWithCapture(fp,capturedQuantizedString,window_size=8):
+def compareFingerprintWithCapture(fp,capturedQuantizedString,title="",window_size=8):
 	hamming_result_vec = []
 	hashmap2 = {}
 	window_size = min(window_size,len(capturedQuantizedString)) # Just in case
@@ -816,18 +830,13 @@ def compareFingerprintWithCapture(fp,capturedQuantizedString,window_size=8):
 		if i+window_size+1 <= len(capturedQuantizedString):
 			estimatedWindow = window+estimatedTag
 			realWindow = capturedQuantizedString[i:i+window_size+1]
-			#if estimatedTag==realWindow[-1]:
-			#	s="<--- SUCCESS"
-			#	counter+=1
-			#else:
-			#	counter=0
-			#	s=""
-			#print("Counter: %d - Expected to see: %c. Actually saw %c  %s"%(counter,estimatedTag,realWindow[-1],s))
 			res = hamming_loss(list(realWindow),list(estimatedWindow))
 			hamming_result_vec.append(res)
 		else:
 			# Do nothing. We've reached the end of the window and don't want to estimate any more.
+			showHammingWindow(hamming_result_vec,title)
 			return (smallest,minHammingWindow(hamming_result_vec,window_size))
+	showHammingWindow(hamming_result_vec,title)
 	return (smallest,minHammingWindow(hamming_result_vec,window_size))
 
 #===============================================================================
@@ -842,7 +851,35 @@ def minHammingWindow(hammingResultVec, windowSize=8):
 		minHamming = min(vecSum, minHamming)
 	return minHamming
 
+def showHammingWindow(hamming_vec,title):
+	X = range(len(hamming_vec))
+	font = {'family' : 'serif',
+        'color'  : 'darkred',
+        'weight' : 'normal',
+        'size'   : 16,
+    }
+	pl.figure()
+	#ax = fig.add_subplot(111)
+	pl.title('Hamming window for '+title, fontdict=font)
 
+	#transOffset = offset_copy(ax.transData, fig=fig, x = 0.08, y=-0.20, units='inches')
+	#for x, y in zip(X, centroids):
+		#pl.plot((x,),(y,), 'ro')
+		#pl.text(x, y, ('%2.4f' % y), transform=transOffset)
+
+	# You can specify a rotation for the tick labels in degrees or with keywords.
+	pl.plot(X, hamming_vec, 'ro')
+	pl.axis([0, len(hamming_vec), 0, 1])
+
+	pl.xlabel('Packet')
+
+	# Pad margins so that markers don't get clipped by the axes
+	pylab.ylabel('Hamming Errors [Sec]')
+	pl.margins(0.2)
+	# Tweak spacing to prevent clipping of tick-labels
+	pl.subplots_adjust(bottom=0.15)
+	pl.show()
+	
 #===============================================================================
 # training looks in a directory list (should be specified), and for each directory
 # it scans the PCAP files and collects timestamps. Afterwards, it runs
@@ -945,10 +982,14 @@ def trainingCallback():
 		tk.Button(tkc.frame_1, compound=tk.LEFT,image=tkc.histoIcon,   text="     Show histogram     ", command=showHistogram).grid(row=0,column=10, rowspan=2, columnspan=2, sticky=tk.E)
 		tk.Button(tkc.frame_1, compound=tk.LEFT,image=tkc.wolframIcon, text="   Fingerprint graphs    ", command=showGraphCallback).grid(row=1, rowspan=2, column=8, columnspan=2, sticky=tk.E+tk.S)
 		tk.Button(tkc.frame_1, compound=tk.LEFT,image=tkc.csvIcon,     text="Export fingerprint CSVs", command=exportCSVs).grid(row=1, rowspan=2, column=10, columnspan=2, sticky=tk.E+tk.S)
-		tk.Label(tkc.frame_2,text="Capture to compare against",font=("Arial", 11),fg="#008000").grid(row=0,column=0, columnspan=3, sticky=tk.N+tk.W)
-		tkc.om.grid(row=1,column=0,columnspan=5, rowspan=1, sticky=tk.W)
-		tk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Start comparison ", command=testCallback).grid(row=1, column=6,sticky=tk.W)
+		tk.Label(tkc.frame_2,text="Capture: ",font=("Arial", 11),fg="#008000").grid(row=0,column=0, columnspan=5, sticky=tk.N+tk.W)
+		tkc.om_capture.grid(row=1,column=0,columnspan=5, rowspan=1, sticky=tk.W+tk.E)
+		tk.Label(tkc.frame_2,text="Fingerprint: ",font=("Arial", 11),fg="#008000").grid(row=0,column=5, columnspan=5, sticky=tk.N+tk.W)
+		tkc.om_fp.grid(row=1,column=5,columnspan=5, rowspan=1, sticky=tk.W+tk.E)
+		tk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Start ", command=testCallback).grid(row=1, column=10, columnspan=4 ,sticky=tk.E)
+		#tk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Hamming graphs ", command=showHammingGraphs).grid(row=1, column=7,sticky=tk.W)
 		tkc.tb.pack(fill="both", expand=True, padx=20, pady=20)#grid(row=2,columnspan=6,rowspan=6, sticky=tk.W+tk.E+tk.N+tk.S)
+		tkc.updateFingerprints([n.tag for n in fp_db])
 
 def showHistogram():
 	pl.figure()
@@ -988,16 +1029,18 @@ def testCallback():
 	tkc.statusLabel.config(fg=tkc.statusFontColorWorking)
 	tkc.statusString.set("Working - Please wait...")
 	tkc.master
-	fileToCompare = tkc.om_v.get()
+	fileToCompare = tkc.om_v_capture.get()
 	capture_string = parsePcapAndGetQuantizedString(fileToCompare,5000,'test')
 	capture_tree = generateTreeFromString(capture_string)
 	tstr = "::"+fileToCompare+"::\n"
 	tstr += "Centroids: %s\n==========================\n"%centroids
 	tstr += "Decision Boundaries: %s\n==========================\n"%decision_boundaries
+	fpToCompare = tkc.om_v_fp.get()
+	
 	for dbi in fp_db:
 		window_size = dbi.tree.sub_tree_size-1
 		print ("Window size for %s is %d"%(dbi.tag,dbi.tree.sub_tree_size))
-		f,l = compareFingerprintWithCapture(dbi.tree,capture_string,window_size)
+		f,l = compareFingerprintWithCapture(dbi.tree,capture_string,dbi.tag,window_size)
 		tstr += "Comparing %s fingerprint, resulted in:\n\tLog loss %f\n\tHamming Loss %f\n\t"%(dbi.tag,f,l)
 		(tf,val) = (checkTreeShapeDiff(dbi.tree, capture_tree))
 		val=val/dbi.tree.sub_tree_size
