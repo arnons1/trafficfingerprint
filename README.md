@@ -24,7 +24,7 @@ The order for the installation is rather important, try to follow it.
   * [pytz](http://www.lfd.uci.edu/~gohlke/pythonlibs/tid72nv9/pytz-2014.2.win-amd64-py3.3.exe)
   * [python-dateutil](http://www.lfd.uci.edu/~gohlke/pythonlibs/tid72nv9/python-dateutil-2.2.win-amd64-py3.3.exe)
   * [Matplotlib/Pyplot/Pylab](http://www.lfd.uci.edu/~gohlke/pythonlibs/tid72nv9/matplotlib-1.3.1.win-amd64-py3.3.exe)
-* [networkx](http://www.lfd.uci.edu/~gohlke/pythonlibs/tid72nv9/networkx-1.8.1.win-amd64-py3.3.exe)
+* [scikit-learn] (http://www.lfd.uci.edu/~gohlke/pythonlibs/)
 
 Recommended:
 * Wolfram Mathematica (For displaying trees)
