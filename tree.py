@@ -876,6 +876,32 @@ def printGraphForWolfram(l, file_name):
 	f.close()
 	call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", file_name])
 	
+def printBarGraphs(l1,title1,l2,title2,fp_names_list,file_name):
+	# 	BarChart[{0, 0.25`, 1.28`, 1.3`, 1.5`, 2.2`, 0.3`}, 
+	# ChartLabels -> {"Bladabindi", "Cryptlocker", "Activex", "Walla", 
+	#   "Google", "Foo", "Bar"}, ChartStyle -> "Pastel", 
+	# PlotLabel -> "Capture x vs all fingerprints"]
+	
+	f = open(file_name, 'w')
+	to_write = ",".join([ str(li) for li in l1 ])
+	s = "l1={"+to_write+"};" 
+	to_write = ",".join([ str(li) for li in l2 ])
+	s += "l2={"+to_write+"};\r\n"
+	fp_names = ",".join(fp_names_list)
+	
+	s += "{"
+	s += "BarChart[l1, LabelingFunction->Above, ChartLabels -> Placed[\r\n"
+	s += "{"+fp_names+"}\r\n,Axis,Rotate[#,\[Pi]/2]&],ChartStyle -> \"Pastel\", PlotLabel -> \""+title1+"\"]"
+	s += ",\r\n"
+	s += "BarChart[l2, LabelingFunction->Above, ChartLabels -> Placed[\r\n"
+	s += "{"+fp_names+"}\r\n,Axis,Rotate[#,\[Pi]/2]&],ChartStyle -> \"Pastel\", PlotLabel -> \""+title2+"\"]"
+	s += "}"
+	f.write(s)
+	f.close()
+	call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", file_name])
+	
+	
+	
 def showHammingWindow(hamming_vec,title):
 	X = range(len(hamming_vec))
 	font = {'family' : 'serif',
@@ -1013,6 +1039,7 @@ def trainingCallback():
 		tk.Label(tkc.frame_2,text="Fingerprint: ",font=("Arial", 11),fg="#008000").grid(row=0,column=5, columnspan=5, sticky=tk.N+tk.W)
 		tkc.om_fp.grid(row=1,column=5,columnspan=5, rowspan=1, sticky=tk.W+tk.E)
 		tk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Start ", command=testCallback).grid(row=1, column=10, columnspan=4, sticky=tk.E)
+		tk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Compare All ", command=testAllCallback).grid(row=2, column=10, columnspan=4, sticky=tk.E)
 		#tk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Hamming graphs ", command=showHammingGraphs).grid(row=1, column=7,sticky=tk.W)
 		tkc.tb.pack(fill="both", expand=True, padx=20, pady=20)#grid(row=2,columnspan=6,rowspan=6, sticky=tk.W+tk.E+tk.N+tk.S)
 	tkc.updateFingerprints([n.tag for n in fp_db])
@@ -1054,7 +1081,6 @@ def testCallback():
 	global tkc
 	tkc.statusLabel.config(fg=tkc.statusFontColorWorking)
 	tkc.statusString.set("Working - Please wait...")
-	tkc.master
 	fileToCompare = tkc.om_v_capture.get()
 	fp = tkc.om_v_fp.get()
 	capture_string = parsePcapAndGetQuantizedString(fileToCompare,1000,'test')
@@ -1084,6 +1110,31 @@ def testCallback():
 	tkc.statusLabel.config(fg=tkc.statusFontColor)
 	tkc.statusString.set("Ready...")
 
+def testAllCallback():
+	global tkc
+	tkc.statusLabel.config(fg=tkc.statusFontColorWorking)
+	tkc.statusString.set("Working - Please wait...")
+	fileToCompare = tkc.om_v_capture.get()
+	capture_string = parsePcapAndGetQuantizedString(fileToCompare,1000,'test')
+	capture_tree = generateTreeFromString(capture_string)
+	l1 = []
+	l2 = []
+	fp_names = []
+	file_name = os.path.join(getcwd(),"wolfram_graphs","test_bargraphs_"+fileToCompare+".nb")
+	for dbi in fp_db:
+		window_size = dbi.tree.sub_tree_size-1
+		l1.append(calculateKLDistance(dbi.tree, capture_tree, 0.05))
+		l2.append(compareTreesByLevel(dbi.tree, capture_tree))
+		#logloss,hammingloss = compareFingerprintWithCapture(dbi.tree,capture_string,dbi.tag,window_size)
+		#l2.append(sum(logloss))
+		fp_names.append('"'+dbi.tag+'"')
+	
+	printBarGraphs(l1, "Capture "+fileToCompare+" with all fingerprints", l2, "", fp_names, file_name)
+	
+	tkc.statusLabel.config(fg=tkc.statusFontColor)
+	tkc.statusString.set("Ready...")
+	
+	
 #===============================================================================
 # Main entry point into the program
 #===============================================================================
