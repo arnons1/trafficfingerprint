@@ -64,6 +64,11 @@ class fingerprint:
 class tkstuff:
 	def __init__(self, master, optionList=[], codebook_default="8"):
 		self.master=master
+		
+		self.master.geometry('900x500+100+50') # set new geometry
+		master.title("Traffic Fingerprinting")
+		master.wm_iconbitmap('icons/fingerprint.ico')
+		
 		self.frame_1 = tk.Frame(self.master, width=680)#grid(row=0,column=0, columnspan=5)#pack(padx=5, pady=5)
 		self.frame_2 = tk.Frame(self.master, width=680)#grid(row=1,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
 		self.frame_3 = tk.Frame(self.master, width=680)#grid(row=2,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
@@ -1185,9 +1190,9 @@ def main():
 		optionList[i] = optionList[i].split('\\')[-1]
 	master = tk.Tk() # Start up TK
 	tkc = tkstuff(master,optionList)
-	tkc.master.title("Traffic Fingerprinting")
-	tkc.master.geometry("900x500")
-	tkc.master.wm_iconbitmap('icons/fingerprint.ico')
+	
+	#tkc.master.geometry("900x500")
+	
 	ttk.Label(tkc.frame_1,text="Pick directories to perform training on from below: ").grid(row=0, column=0, columnspan=8, sticky=tk.W)
 	i=0
 	for x in os.walk('.'):
