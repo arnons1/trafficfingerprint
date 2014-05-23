@@ -121,6 +121,11 @@ class tkstuff:
 		
 		self.pb = ttk.Progressbar(self.frame_3,orient=tk.HORIZONTAL, length=200, mode='determinate')
 		self.percentage = tk.StringVar()
+		
+		self.graphs = ["","",""]
+		self.button_bargraph = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="All fingerprints", command=showBarGraph)
+		self.button_logloss = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="Log Loss", command=showLogLossGraph)
+		self.button_hammingloss = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="Hamming Loss", command=showHammingLossGraph)
 
 		
 	def updateFingerprints(self,optionList=[]):
@@ -880,7 +885,7 @@ def movingAverageHammingWindow(hammingResultVec, windowSize=8):
 #===============================================================================
 # printGraphForWolfram prints a graph from points to Wolfram
 #===============================================================================
-def printGraphForWolfram(l, file_name, graph_type="logloss", window_size=8,openWolfram=0):
+def printGraphForWolfram(l, file_name, graph_type="logloss", window_size=8,open_wolfram=0):
 	# Format:
 	# l = {0, 1, 0, 0, 0, 1, 1, 1, 0}; k = 
 	# MapThread[List, {Range[1, Length[l]], l}]; ListLinePlot[k]
@@ -892,10 +897,10 @@ def printGraphForWolfram(l, file_name, graph_type="logloss", window_size=8,openW
 		s += "\nwindowSize = "+str(window_size)+";r = Range[1, Length[l] - windowSize];  k := Total[Take[l, {#1, #1 + windowSize}]] & ; ListLinePlot[Map[k, r]]"
 	f.write(s)
 	f.close()
-	if openWolfram!=0:
+	if open_wolfram!=0:
 		call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", file_name])
 	
-def printBarGraphs(l1,title1,l2,title2,fp_names_list,file_name):
+def printBarGraphs(l1,title1,l2,title2,fp_names_list,file_name,open_wolfram=0):
 	# 	BarChart[{0, 0.25`, 1.28`, 1.3`, 1.5`, 2.2`, 0.3`}, 
 	# ChartLabels -> {"Bladabindi", "Cryptlocker", "Activex", "Walla", 
 	#   "Google", "Foo", "Bar"}, ChartStyle -> "Pastel", 
@@ -919,7 +924,8 @@ def printBarGraphs(l1,title1,l2,title2,fp_names_list,file_name):
 	s += "Show[r0,r1,Background->None]"
 	f.write(s)
 	f.close()
-	call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", file_name])
+	if open_wolfram!=0:
+		call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", file_name])
 	
 	
 	
@@ -1084,6 +1090,16 @@ def showGraphCallback():
 	for dbi in fp_db:
 		printTreeForWolfram(dbi.tree, dbi.tag)
 
+def showLogLossGraph():
+	call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", tkc.graphs[1]])
+
+def showHammingLossGraph():
+	print("Address is "+tkc.graphs[2])
+	call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", tkc.graphs[2]])
+
+def showBarGraph():
+	call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", tkc.graphs[0]])
+	
 def testFingerprintVsOne(fingerprint, testSubject, weights=[33,33,33], kldFactor=0.5 ):
 	(_tf,tsd) = checkTreeShapeDiff(fingerprint, testSubject)
 	tsd=tsd/fingerprint.sub_tree_size
@@ -1117,7 +1133,7 @@ def testCallback():
 	f,l = compareFingerprintWithCapture(dbi.tree,capture_string,dbi.tag,window_size)
 
 	logloss_file_name = "logloss_"+fp+"_"+fileToCompare+".nb"
-	printGraphForWolfram(f,os.path.join(getcwd(),"wolfram_graphs",logloss_file_name,"logloss",0,0)) 
+	printGraphForWolfram(f,os.path.join(getcwd(),"wolfram_graphs",logloss_file_name),"logloss",0,0) 
 	hammingloss_file_name = "hammingloss_"+fp+"_"+fileToCompare+".nb"
 	printGraphForWolfram(l,os.path.join(getcwd(),"wolfram_graphs",hammingloss_file_name),"hammingloss",window_size,0)
 	kld = calculateKLDistance(dbi.tree, capture_tree, 0.05)
@@ -1129,6 +1145,10 @@ def testCallback():
 		tkc.pb.step(99.9)
 	else:
 		tkc.pb.step(percentage)
+	tkc.graphs[1] = os.path.join(getcwd(),"wolfram_graphs",logloss_file_name)
+	tkc.graphs[2] = os.path.join(getcwd(),"wolfram_graphs",hammingloss_file_name)
+	tkc.button_hammingloss.grid(row=3,column=2, columnspan=2, sticky=tk.E)
+	tkc.button_logloss.grid(row=3,column=4, columnspan=2, sticky=tk.W)
 	tkc.statusLabel.config(style="GR.TLabel")
 	tkc.statusString.set("Ready...")
 
@@ -1148,8 +1168,9 @@ def testAllCallback():
 #		l2.append(compareTreesByLevel(dbi.tree, capture_tree))
 		fp_names.append('"'+dbi.tag+'"')
 	
-	printBarGraphs(l1, "Capture "+fileToCompare+" with all fingerprints", l2, "", fp_names, file_name)
-	
+	printBarGraphs(l1, "Capture "+fileToCompare+" with all fingerprints", l2, "", fp_names, file_name,0)
+	tkc.graphs[0] = file_name
+	tkc.button_bargraph.grid(row=3,column=0, columnspan=2, sticky=tk.E)
 	tkc.statusLabel.config(style="GR.TLabel")
 	tkc.statusString.set("Ready...")
 	
