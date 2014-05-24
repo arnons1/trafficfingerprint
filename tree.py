@@ -62,7 +62,7 @@ class fingerprint:
 #===============================================================================
 
 class tkstuff:
-	def __init__(self, master, optionList=[], codebook_default="8"):
+	def __init__(self, master, codebook_default="12"):
 		self.master=master
 		
 		self.master.geometry('900x500+100+50') # set new geometry
@@ -87,9 +87,11 @@ class tkstuff:
 
 		# Test dropdown
 		self.om_v_capture = tk.StringVar()
-		self.om_v_capture.set(optionList[0])
-		self.om_capture = ttk.OptionMenu(self.frame_2, self.om_v_capture, *optionList)
+		self.optionList=['None']
+		self.om_v_capture.set(self.optionList[0])
+		self.om_capture = ttk.OptionMenu(self.frame_2, self.om_v_capture, *self.optionList)		
 		
+		# Fingerprint dropdown
 		self.om_v_fp = tk.StringVar()
 		self.ol2=['None']
 		self.om_v_fp.set(self.ol2[0])
@@ -99,34 +101,26 @@ class tkstuff:
 		
 		# Spinbox for codebook size
 		self.var = tk.StringVar(self.frame_1) # Hack begins
-		self.sb = spinbox.Spinbox(self.frame_1, from_=1, to=15,textvariable=self.var)
+		self.sb = spinbox.Spinbox(self.frame_1, from_=1, to=25,textvariable=self.var)
 		self.var.set(codebook_default) # Stupid dirty hack ends. Sets the default centroids value to 8.
-		# Textbox (console):
-		self.tb = tkst.ScrolledText(
- 								master = self.frame_3,
-     							wrap   = tk.WORD,
-	 							width  = 95,
-		    	 				height = 18, font=("Courier New",10)
-		    	 				)
-		
-		self.statusFontColor = "#00AA00" 
-		self.statusFontColorWorking = "#AAAA00" 
-		self.statusFontColorError = "#AA0000" # Reddish
-		
+				
 		self.statusLabel = ttk.Label(self.frame_4,textvariable=self.statusString,font=("Arial", 14),style="GR.TLabel")
 		self.statusLabel.grid(row=0,column=1, columnspan=5, sticky=tk.N)
 				
+		# Progressbar for displaying 
+		self.pb = ttk.Progressbar(self.frame_3,orient=tk.HORIZONTAL, length=200, mode='determinate')
+		self.percentage = tk.StringVar()
+		self.candidate = tk.StringVar()
+		
+		# Icons
 		self.histoIcon = tk.PhotoImage(file="icons/histogram.gif")
 		self.trainIcon = tk.PhotoImage(file="icons/train.gif")
 		self.quantIcon = tk.PhotoImage(file="icons/quantization.gif")
 		self.testIcon = tk.PhotoImage(file="icons/test.gif")
 		self.wolframIcon = tk.PhotoImage(file="icons/wolfram.gif")
 		self.csvIcon = tk.PhotoImage(file="icons/csv.gif")
-		
-		
-		self.pb = ttk.Progressbar(self.frame_3,orient=tk.HORIZONTAL, length=200, mode='determinate')
-		self.percentage = tk.StringVar()
-		
+
+		# Graphing buttons
 		self.graphs = ["","",""]
 		self.button_bargraph = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="All fingerprints", command=showBarGraph)
 		self.button_logloss = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="Log Loss", command=showLogLossGraph)
@@ -137,10 +131,17 @@ class tkstuff:
 		self.om_v_fp.set('')
 		self.om_fp['menu'].delete(0, 'end')
 		# Insert list of new options (tk._setit hooks them up to var)
-		new_choices = optionList
-		for choice in new_choices:	
+		for choice in optionList:	
 			self.om_fp['menu'].add_command(label=choice, command=tk._setit(self.om_v_fp, choice))
 		self.om_v_fp.set(optionList[0])
+	
+	def updateCaptures(self,optionList=[]):
+		self.om_v_capture.set('')
+		self.om_capture['menu'].delete(0, 'end')
+		# Insert list of new options (tk._setit hooks them up to var)
+		for choice in optionList:	
+			self.om_capture['menu'].add_command(label=choice, command=tk._setit(self.om_v_capture, choice))
+		self.om_v_capture.set(optionList[0])
 
 		
 
@@ -986,7 +987,7 @@ def training(dir_list = ['training_1'], codebook_size = 8):
 		decision_boundaries.append((centroids[i]+centroids[i-1])*0.5)
 		i+=1
 	for file in pcaps_filelist_for_training: # Add fingerprints to fp_db
-		t = generateTreeFromString(parsePcapAndGetQuantizedString(file,50))
+		t = generateTreeFromString(parsePcapAndGetQuantizedString(file,150))
 		filename = (file.split('\\')[-1]).split('.')[0]
 		fp_db.append(fingerprint(filename,t))
 
@@ -1070,12 +1071,13 @@ def trainingCallback():
 		tkc.om_capture.grid(row=1,column=0,columnspan=5, rowspan=1, sticky=tk.W+tk.E)
 		ttk.Label(tkc.frame_2,text="Fingerprint: ",font=("Arial", 11),style="GR.TLabel").grid(row=0,column=8, columnspan=5, sticky=tk.N+tk.W)
 		tkc.om_fp.grid(row=1,column=8,columnspan=5, rowspan=1, sticky=tk.W+tk.E)
-		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Analyze ", command=testCallback).grid(row=1, column=14, columnspan=4, sticky=tk.E)
-		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Compare capture w/all fingerprints ", command=testAllCallback).grid(row=2, column=0, columnspan=4, sticky=tk.E)
+		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Analyze just this fingerprint ", command=testCallback).grid(row=1, column=14, columnspan=4, sticky=tk.E)
+		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Compare capture w/all fingerprints ", command=testAllCallback).grid(row=2, column=1, columnspan=4, sticky=tk.W+tk.E)
 		ttk.Label(tkc.frame_3,text="Analysis result: ",font=("Arial",14)).grid(row=0,column=0,sticky=tk.W)
 		ttk.Label(tkc.frame_3,text=" Tree-Distance (KL) method: ",font=("Arial",11)).grid(row=1,column=0, columnspan=3)
 		tkc.pb.grid(row=1,column=4,sticky=tk.E)
-		ttk.Label(tkc.frame_3,textvariable=tkc.percentage,font=("Arial",11)).grid(row=1,column=6, columnspan=1,sticky=tk.E)
+		ttk.Label(tkc.frame_3,textvariable=tkc.percentage,font=("Arial",10)).grid(row=1,column=6, columnspan=1,sticky=tk.E)
+		ttk.Label(tkc.frame_3,textvariable=tkc.candidate,font=("Arial",9)).grid(row=1,column=8, columnspan=2,sticky=tk.E)
 	tkc.updateFingerprints([n.tag for n in fp_db])
 
 def showHistogram():
@@ -1142,18 +1144,13 @@ def testCallback():
 	hammingloss_file_name = "hammingloss_"+fp+"_"+fileToCompare+".nb"
 	printGraphForWolfram(l,os.path.join(getcwd(),"wolfram_graphs",hammingloss_file_name),"hammingloss",window_size,0)
 	kld = calculateKLDistance(dbi.tree, capture_tree, 0.05)
-	percentage = min(1,(kld / 6)) # 2*thresh works well for percentages
-	percentage = (1-percentage)*100
-	tkc.percentage.set(str(percentage)+"%")
-	tkc.pb.stop()
-	if percentage==100:
-		tkc.pb.step(99.9)
-	else:
-		tkc.pb.step(percentage)
+	setPercentage(kld)
+
 	tkc.graphs[1] = os.path.join(getcwd(),"wolfram_graphs",logloss_file_name)
 	tkc.graphs[2] = os.path.join(getcwd(),"wolfram_graphs",hammingloss_file_name)
 	tkc.button_hammingloss.grid(row=3,column=2, columnspan=2, sticky=tk.E)
 	tkc.button_logloss.grid(row=3,column=4, columnspan=2, sticky=tk.W)
+	tkc.candidate.set("")
 	tkc.statusLabel.config(style="GR.TLabel")
 	tkc.statusString.set("Ready...")
 
@@ -1173,25 +1170,42 @@ def testAllCallback():
 #		l2.append(compareTreesByLevel(dbi.tree, capture_tree))
 		fp_names.append('"'+dbi.tag+'"')
 	
+	min_val = l1[0]
+	min_name = fp_names[0]
+	for i in range(len(l1)):
+		if l1[i] < min_val:
+			min_val = l1[i]
+			min_name = fp_names[i]
+	
 	printBarGraphs(l1, "Capture "+fileToCompare+" with all fingerprints", l2, "", fp_names, file_name,0)
 	tkc.graphs[0] = file_name
 	tkc.button_bargraph.grid(row=3,column=0, columnspan=2, sticky=tk.E)
+	setPercentage(min_val)
+	tkc.candidate.set("Most likely "+min_name)
+	
 	tkc.statusLabel.config(style="GR.TLabel")
 	tkc.statusString.set("Ready...")
 	
-
+def setPercentage(val):
+	percentage = min(1,(val / 6)) # 2*thresh works well for percentages
+	percentage = (1-percentage)*100
+	tkc.percentage.set("%3.2f"%(percentage)+"%")
+	tkc.pb.stop()
+	if percentage==100:
+		tkc.pb.step(99.9)
+	else:
+		tkc.pb.step(percentage)
 #===============================================================================
 # Main entry point into the program
 #===============================================================================	
 def main():
 	global tkc
-	optionList = findAllPcapFiles('test')
-	for i in range(len(optionList)):
-		optionList[i] = optionList[i].split('\\')[-1]
-	master = tk.Tk() # Start up TK
-	tkc = tkstuff(master,optionList)
-	
-	#tkc.master.geometry("900x500")
+	tkc = tkstuff(tk.Tk(),"25") # Start up TK
+
+	captures_list = findAllPcapFiles('test')
+	for i in range(len(captures_list)):
+		captures_list[i] = captures_list[i].split('\\')[-1]
+	tkc.updateCaptures(captures_list)
 	
 	ttk.Label(tkc.frame_1,text="Pick directories to perform training on from below: ").grid(row=0, column=0, columnspan=8, sticky=tk.W)
 	i=0
