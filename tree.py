@@ -6,7 +6,6 @@ import difflib # Finding closest strings
 from nt import getcwd # Get current working directory
 import tkinter as tk # UI
 import ttk
-import tkinter.scrolledtext as tkst
 
 import numpy as np # Number methods (average, median, stdev,...)
 import scipy as sp
@@ -20,8 +19,6 @@ from sklearn.metrics import hamming_loss
 import spinbox
 ### TODO:
 ### 1. Create new training set with PCAPS with filter (tcp || dns) && !ipv6 && !(ip.addr==224.0.0.0/16)
-### 2. Choose PCAP to compare with - add to UI
-### 3.
 
 
 lzHashmap = {}
@@ -633,7 +630,6 @@ def smoothKLContinuity(itemname, node_list):
 def calculateKLDistance(tree1, tree2, factor=0.5):
 	p = genListOfNodes(tree1) # Tree1 is the fingerprint. Only leaves.
 	q = genListOfNodes(tree2) #findLeavesTree(tree2) # Second list
-	# TODO: I altered the above, because I think we may need to do this on all nodes instead of just the leaves.
 	kl_distance_sum = 0
 	counter = 0
 
@@ -649,7 +645,6 @@ def calculateKLDistance(tree1, tree2, factor=0.5):
 # checkTreeShapeDiff is the second of our home-made algorithms. It attempts to find
 # similarity in the tree shapes. The result is a tuple. The first is a boolean stating if
 # the trees are identical. The second lists the number of mismatches found.
-# TODO: Normalize the number
 #===============================================================================
 def checkTreeShapeDiff(tree1,tree2):
 	if len(tree1.sub_tree)==0 and len(tree2.sub_tree)==0:
@@ -686,15 +681,6 @@ def quantDist(left, right): # Always between 0 and 1, unless error: then -1.
 	except IndexError:
 		print("l: %s r: %s not found" %(left,right))
 		return 1
-
-
-
-### TODO:
-###  1. Normalize the values ('average' them out so that they total 1 per level
-###  3. Check obviously. Verify results
-###  4. Build some sort of testing framework - so that we can run many tests at once with varying vlaues of factors and length of files and so on.
-###  5. UI - to make things look nice.
-###  6. Find string in tree   - ????
 
 
 #===============================================================================
