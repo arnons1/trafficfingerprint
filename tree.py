@@ -911,13 +911,14 @@ def printBarGraphs(l1,title1,l2,title2,fp_names_list,file_name,open_wolfram=0,th
 	fp_names = ",".join(fp_names_list)
 	
 	#s += "{"
-	s += "r0=BarChart[l1, LabelingFunction->None,GridLines->{{},Range[5,55,5]}, ChartLabels -> Placed[\n"
-	s += "{"+fp_names+"}\n,Axis,Rotate[#,\[Pi]/2]&],ChartStyle -> \"Pastel\", PlotLabel -> \""+title1+"\"];"
+	s += "r0=BarChart[l1,  BarOrigin->Left,LabelingFunction->Left,GridLines->{{},Range[5,55,5]}, ChartLabels -> Placed[\n"
+	s += "{"+fp_names+"}\n,Axis,Rotate[#,0]&],ChartStyle -> \"Pastel\", PlotLabel -> \""+title1+"\", \n"
+	s += "ChartElementFunction->ChartElementDataFunction[\"SegmentScaleRectangle\",\"Segments\"->250,\"ColorScheme\"->\"Pastel\"]];"
 	#s += ",\r\n"
 	#s += "BarChart[l2, LabelingFunction->Above, ChartLabels -> Placed[\r\n"
 	#s += "{"+fp_names+"}\r\n,Axis,Rotate[#,\[Pi]/2]&],ChartStyle -> \"Pastel\", PlotLabel -> \""+title2+"\"]"
 	#s += "}"
-	s += "r1 = Plot[%2.2f,{x, 0, 1 + Length[l1]},PlotStyle->{Red,Dashed,Thick}];\n"%(thresh)
+	s += "r1 = Graphics[{Red, Thick, Line[{{%2.2f, 0}, {%2.2f, Length[l1] + 1}}]}];\n"%(thresh,thresh)
 	s += "Show[r0,r1,Background->None]"
 	f.write(s)
 	f.close()
