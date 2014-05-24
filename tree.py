@@ -97,9 +97,14 @@ class tkstuff:
 		self.statusString = tk.StringVar()
 		
 		# Spinbox for codebook size
-		self.var = tk.StringVar(self.frame_1) # Hack begins
-		self.sb = spinbox.Spinbox(self.frame_1, from_=1, to=25,textvariable=self.var)
-		self.var.set(codebook_default) # Stupid dirty hack ends. Sets the default centroids value to 8.
+		self.var_centroid_sb = tk.StringVar(self.frame_1) # Hack begins
+		self.centroid_sb = spinbox.Spinbox(self.frame_1, from_=1, to=25,textvariable=self.var_centroid_sb)
+		self.var_centroid_sb.set(codebook_default) # Stupid dirty hack ends. Sets the default centroids value to 8.
+		
+		# Spinbox for codebook size
+		self.var_thresh_sb = tk.StringVar(self.frame_1) # Hack begins
+		self.thresh_sb = spinbox.Spinbox(self.frame_1, from_=1.0, to=15.0, increment=0.5 ,textvariable=self.var_thresh_sb)
+		self.var_thresh_sb.set("3.0") # Stupid dirty hack ends. Sets the default centroids value to 8.
 				
 		self.statusLabel = ttk.Label(self.frame_4,textvariable=self.statusString,font=("Arial", 14),style="GR.TLabel")
 		self.statusLabel.grid(row=0,column=1, columnspan=5, sticky=tk.N)
@@ -127,7 +132,7 @@ class tkstuff:
 	def updateFingerprints(self,optionList=[]):
 		self.om_v_fp.set('')
 		self.om_fp['menu'].delete(0, 'end')
-		# Insert list of new options (tk._setit hooks them up to var)
+		# Insert list of new options (tk._setit hooks them up to var_centroid_sb)
 		for choice in optionList:	
 			self.om_fp['menu'].add_command(label=choice, command=tk._setit(self.om_v_fp, choice))
 		self.om_v_fp.set(optionList[0])
@@ -135,7 +140,7 @@ class tkstuff:
 	def updateCaptures(self,optionList=[]):
 		self.om_v_capture.set('')
 		self.om_capture['menu'].delete(0, 'end')
-		# Insert list of new options (tk._setit hooks them up to var)
+		# Insert list of new options (tk._setit hooks them up to var_centroid_sb)
 		for choice in optionList:	
 			self.om_capture['menu'].add_command(label=choice, command=tk._setit(self.om_v_capture, choice))
 		self.om_v_capture.set(optionList[0])
@@ -892,7 +897,7 @@ def printGraphForWolfram(l, file_name, graph_type="logloss", window_size=8,open_
 	if open_wolfram!=0:
 		call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", file_name])
 	
-def printBarGraphs(l1,title1,l2,title2,fp_names_list,file_name,open_wolfram=0):
+def printBarGraphs(l1,title1,l2,title2,fp_names_list,file_name,open_wolfram=0,thresh=3.0):
 	# 	BarChart[{0, 0.25`, 1.28`, 1.3`, 1.5`, 2.2`, 0.3`}, 
 	# ChartLabels -> {"Bladabindi", "Cryptlocker", "Activex", "Walla", 
 	#   "Google", "Foo", "Bar"}, ChartStyle -> "Pastel", 
@@ -912,7 +917,7 @@ def printBarGraphs(l1,title1,l2,title2,fp_names_list,file_name,open_wolfram=0):
 	#s += "BarChart[l2, LabelingFunction->Above, ChartLabels -> Placed[\r\n"
 	#s += "{"+fp_names+"}\r\n,Axis,Rotate[#,\[Pi]/2]&],ChartStyle -> \"Pastel\", PlotLabel -> \""+title2+"\"]"
 	#s += "}"
-	s += "r1 = Plot[3,{x, 0, 1 + Length[l1]},PlotStyle->{Red,Dashed,Thick}];\n"
+	s += "r1 = Plot[%2.2f,{x, 0, 1 + Length[l1]},PlotStyle->{Red,Dashed,Thick}];\n"%(thresh)
 	s += "Show[r0,r1,Background->None]"
 	f.write(s)
 	f.close()
@@ -1043,8 +1048,8 @@ def trainingCallback():
 	items = map(int,tkc.directorylb.curselection())
 	l = []
 	for i in items:
-		l.append(list_of_dirs[i]) #.replace('/','\\'))
-	training(l,int(tkc.sb.get()))
+		l.append(list_of_dirs[i])
+	training(l,int(tkc.centroid_sb.get()))
 	tkc.statusLabel.config(style="GR.TLabel")
 	tkc.statusString.set("Done training!")
 	if is_first_time==True:
@@ -1122,13 +1127,12 @@ def testCallback():
 	tstr += "Decision Boundaries: %s\n==========================\n"%decision_boundaries
 	dbi = findFpByTag(fp)
 	window_size = dbi.tree.sub_tree_size-1
-	print ("Window size for %s is %d"%(dbi.tag,dbi.tree.sub_tree_size))
-	f,l = compareFingerprintWithCapture(dbi.tree,capture_string,dbi.tag,window_size)
+	logloss_result,hamming_result = compareFingerprintWithCapture(dbi.tree,capture_string,dbi.tag,window_size)
 
 	logloss_file_name = "logloss_"+fp+"_"+fileToCompare+".nb"
-	printGraphForWolfram(f,os.path.join(getcwd(),"wolfram_graphs",logloss_file_name),"logloss",0,0) 
+	printGraphForWolfram(logloss_result,os.path.join(getcwd(),"wolfram_graphs",logloss_file_name),"logloss",0,0) 
 	hammingloss_file_name = "hammingloss_"+fp+"_"+fileToCompare+".nb"
-	printGraphForWolfram(l,os.path.join(getcwd(),"wolfram_graphs",hammingloss_file_name),"hammingloss",window_size,0)
+	printGraphForWolfram(hamming_result,os.path.join(getcwd(),"wolfram_graphs",hammingloss_file_name),"hammingloss",window_size,0)
 	kld = calculateKLDistance(dbi.tree, capture_tree, 0.05)
 	setPercentage(kld)
 
@@ -1162,18 +1166,18 @@ def testAllCallback():
 		if l1[i] < min_val:
 			min_val = l1[i]
 			min_name = fp_names[i]
-	
-	printBarGraphs(l1, "Capture "+fileToCompare+" with all fingerprints", l2, "", fp_names, file_name,0)
+	thresh = float(tkc.thresh_sb.get())
+	printBarGraphs(l1, "Capture "+fileToCompare+" with all fingerprints", l2, "", fp_names, file_name,0,thresh)
 	tkc.graphs[0] = file_name
 	tkc.button_bargraph.grid(row=3,column=0, columnspan=2, sticky=tk.E)
-	setPercentage(min_val)
+	setPercentage(min_val,thresh)
 	tkc.candidate.set("Most likely "+min_name)
 	
 	tkc.statusLabel.config(style="GR.TLabel")
 	tkc.statusString.set("Ready...")
 	
-def setPercentage(val):
-	percentage = min(1,(val / 6)) # 2*thresh works well for percentages
+def setPercentage(val,thresh=3.0):
+	percentage = min(1,(val / (2*thresh))) # 2*thresh works well for percentages
 	percentage = (1-percentage)*100
 	tkc.percentage.set("%3.2f"%(percentage)+"%")
 	tkc.pb.stop()
@@ -1200,12 +1204,17 @@ def main():
 			list_of_dirs.append(x[0][2:])
 			tkc.directorylb.insert(i,x[0][2:])
 			i+=1
-	tkc.directorylb.grid(row=1, column=0, columnspan=2, padx=15, pady=3, sticky=tk.N)#pack(side=tk.TOP)
-	ttk.Label(tkc.frame_1,text="Centroids ",font=("Arial", 11),style="GR.TLabel").grid(row=1,column=3,padx=2,sticky=tk.E)
-	tkc.sb.config(width=3)
-	tkc.sb.grid(row=1, column=4,padx=2,sticky=tk.W)
+	tkc.directorylb.grid(row=1, column=0, columnspan=2, rowspan=3, padx=15, pady=3, sticky=tk.N)#pack(side=tk.TOP)
+	ttk.Label(tkc.frame_1,text="Centroids ",font=("Arial", 11),style="BW.TLabel").grid(row=1,column=3,padx=2,sticky=tk.E)
+	tkc.centroid_sb.config(width=3)
+	tkc.centroid_sb.grid(row=1, column=4,padx=2,sticky=tk.W)
+	
+	ttk.Label(tkc.frame_1,text="Threshold ",font=("Arial", 11),style="BW.TLabel").grid(row=2,column=3,padx=2,sticky=tk.E+tk.N)
+	tkc.thresh_sb.config(width=4)
+	tkc.thresh_sb.grid(row=2, column=4,padx=2,sticky=tk.W+tk.N)
+	
 	b = ttk.Button(tkc.frame_1,compound=tk.LEFT,image=tkc.trainIcon,text="Start Training" , command=trainingCallback)
-	b.grid(row=1,column=5,rowspan=2,columnspan=2,sticky=tk.W,padx=10)#pack(side=tk.BOTTOM)
+	b.grid(row=0,column=5,rowspan=3,columnspan=2,sticky=tk.W,padx=10)#pack(side=tk.BOTTOM)
 	
 	ttk.Label(tkc.frame_4,text="Status:",font=("Arial", 14)).grid(row=0, column=0, sticky=tk.N)
 	
