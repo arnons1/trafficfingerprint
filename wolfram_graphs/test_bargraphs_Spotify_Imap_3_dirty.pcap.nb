@@ -1,0 +1,6 @@
+l1={6.0968252820919915,4.964832407404199,5.430123993406179,9.664621358791557,9.564469183667171,2.4360122440071814,7.502074453192977};
+r0=BarChart[l1,  BarOrigin->Left,LabelingFunction->Left,GridLines->{{},Range[5,55,5]}, ChartLabels -> Placed[
+{"bittorrent","http_web_with_jpegs","irc_1","nntp","smtp","Spotify_1","telnet"}
+,Axis,Rotate[#,0]&],ChartStyle -> "Pastel", PlotLabel -> "Capture Spotify_Imap_3_dirty.pcap with all fingerprints", 
+ChartElementFunction->ChartElementDataFunction["SegmentScaleRectangle","Segments"->250,"ColorScheme"->"Pastel"]];r1 = Graphics[{Red, Thick, Line[{{3.00, 0}, {3.00, Length[l1] + 1}}]}];
+Show[r0,r1,Background->None]

@@ -6,6 +6,8 @@
 *.exe
 *.o
 *.so
+*.project
+*.pydevproject
  
 # Packages #
 ############
@@ -26,7 +28,6 @@
 *.sql
 *.sqlite
 *.csv
-*.nb
  
 # OS generated files #
 ######################

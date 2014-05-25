@@ -1,0 +1,2 @@
+l={0.23956131799490415,0.29769429344958775,0.2962512472327462,0.2962512472327462,0.23956131799490415}; k=MapThread[List, {Range[1, Length[l]], l}];
+ListLinePlot[k,Filling->Axis,AxesLabel->Automatic,PlotRange->All]

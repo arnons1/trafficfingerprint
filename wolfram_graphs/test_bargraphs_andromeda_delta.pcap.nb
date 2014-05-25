@@ -1,0 +1,5 @@
+l1={18.290716770641723,5.009174324520759,7.981660552636565,6.84095173629896,4.376852181386633,8.407870812266424,5.346309330058739,7.3344502728174845,30.124085391111272,14.852953686027126,30.12408539111127,19.785704329247455,8.407870812266424,8.407870812266424,14.929288345918376,14.929288345918376,4.959411399168166,4.712332107356112,4.959411399168166,2.863484435075298};
+r0=BarChart[l1, LabelingFunction->None,GridLines->{{},Range[5,55,5]}, ChartLabels -> Placed[
+{"andromeda_beta_1","Bladabindi_alpha_1","Bladabindi_alpha_2","Bladabindi_alpha_3","cryptlocker_alpha_1","cryptlocker_alpha_2","cryptlocker_alpha_3","cryptlocker_alpha_4","cryptlocker_beta_1","cryptlocker_beta_2","cryptlocker_beta_3","cryptlocker_beta_4","cryptlocker_gamma_1","cryptlocker_gamma_2","Darkcomet_alpha_1","Darkcomet_alpha_2","Hesperbor_beta_1","Hesperbor_beta_2","Hesperbor_beta_3","Renovator_gamma_1"}
+,Axis,Rotate[#,\[Pi]/2]&],ChartStyle -> "Pastel", PlotLabel -> "Capture andromeda_delta.pcap with all fingerprints"];r1 = Plot[3,{x, 0, 1 + Length[l1]},PlotStyle->{Red,Dashed,Thick}];
+Show[r0,r1,Background->None]

@@ -1,0 +1,6 @@
+l1={8.900057196779121,6.876023691317099,7.013715079639671,8.04800922202104,9.888347721795098,9.923399125056335,8.579423224356121};
+r0=BarChart[l1,  BarOrigin->Left,LabelingFunction->Left,GridLines->{{},Range[5,55,5]}, ChartLabels -> Placed[
+{"bittorrent","http_web_with_jpegs","irc_1","nntp","smtp","Spotify_1","telnet"}
+,Axis,Rotate[#,0]&],ChartStyle -> "Pastel", PlotLabel -> "Capture engadget.pcap with all fingerprints", 
+ChartElementFunction->ChartElementDataFunction["SegmentScaleRectangle","Segments"->250,"ColorScheme"->"Pastel"]];r1 = Graphics[{Red, Thick, Line[{{3.00, 0}, {3.00, Length[l1] + 1}}]}];
+Show[r0,r1,Background->None]
