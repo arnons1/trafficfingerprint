@@ -63,7 +63,7 @@ class tkstuff:
 	def __init__(self, master, codebook_default="12"):
 		self.master=master
 		
-		self.master.geometry('520x610+100+50') # set new geometry
+		self.master.geometry('520x680+100+50') # set new geometry
 		master.title("Traffic Fingerprinting")
 		master.wm_iconbitmap('icons/fingerprint.ico')
 		
@@ -118,6 +118,7 @@ class tkstuff:
 		
 		# Icons
 		self.histoIcon = tk.PhotoImage(file="icons/histogram.gif")
+		self.barchartIcon = tk.PhotoImage(file="icons/barchart.gif")
 		self.trainIcon = tk.PhotoImage(file="icons/train2.gif")
 		self.quantIcon = tk.PhotoImage(file="icons/quantization.gif")
 		self.testIcon = tk.PhotoImage(file="icons/test2.gif")
@@ -126,7 +127,7 @@ class tkstuff:
 
 		# Graphing buttons
 		self.graphs = ["","",""]
-		self.button_bargraph = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="All fingerprints", command=showBarGraph)
+		self.button_bargraph = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.barchartIcon,   text="All fingerprints", command=showBarGraph)
 		self.button_logloss = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="Log Loss", command=showLogLossGraph)
 		self.button_hammingloss = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="Hamming Loss", command=showHammingLossGraph)
 
@@ -1065,14 +1066,14 @@ def trainingCallback():
 		tkc.om_capture.grid(row=0,column=3,columnspan=5, rowspan=1, sticky=tk.W)
 		ttk.Label(tkc.frame_2,text="Fingerprint: ",font=("Arial", 11),style="GR.TLabel").grid(row=2,column=0, padx=3,columnspan=2, sticky=tk.N+tk.W)
 		tkc.om_fp.grid(row=2,column=3,columnspan=5, rowspan=1, sticky=tk.W)
-		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Analyze just this fingerprint ", command=testCallback).grid(row=1, column=0,  padx=15, pady=3, columnspan=5, sticky=tk.W)
-		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Compare capture w/all fingerprints ", command=testAllCallback).grid(row=3, column=0, padx=15, pady=3, columnspan=5, sticky=tk.W)
+		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Analyze just this fingerprint ", command=testCallback).grid(row=3, column=0,  padx=15, pady=3, columnspan=5, sticky=tk.W)
+		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Compare capture w/all fingerprints ", command=testAllCallback).grid(row=1, column=0, padx=15, pady=3, columnspan=5, sticky=tk.W)
 		ttk.Separator(tkc.frame_3,orient=tk.HORIZONTAL).grid(row=0,columnspan=100,sticky="ew")
 		ttk.Label(tkc.frame_3,text="Analysis result: ",font=("Arial",14)).grid(row=1,column=0,sticky=tk.W)
 		ttk.Label(tkc.frame_3,text=" Tree-Distance (KL) method: ",font=("Arial",11)).grid(row=2,column=0, columnspan=3)
 		tkc.pb.grid(row=2,column=4,sticky=tk.E)
 		ttk.Label(tkc.frame_3,textvariable=tkc.percentage,font=("Arial",10)).grid(row=2,column=6, columnspan=1,sticky=tk.E)
-		ttk.Label(tkc.frame_3,textvariable=tkc.candidate,font=("Arial",9)).grid(row=3,column=4, columnspan=2,sticky=tk.E)
+		ttk.Label(tkc.frame_3,textvariable=tkc.candidate,font=("Arial",9)).grid(row=3,column=4, columnspan=3,sticky=tk.W)
 	tkc.updateFingerprints([n.tag for n in fp_db])
 
 def showHistogram():
