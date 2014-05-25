@@ -28,6 +28,7 @@ centroids = []
 decision_boundaries = []
 list_of_dirs = []
 is_first_time = True
+is_first_analysis = True
 fp_db=[] # For storing the fingerprints
 
 #===============================================================================
@@ -62,14 +63,15 @@ class tkstuff:
 	def __init__(self, master, codebook_default="12"):
 		self.master=master
 		
-		self.master.geometry('900x500+100+50') # set new geometry
+		self.master.geometry('520x580+100+50') # set new geometry
 		master.title("Traffic Fingerprinting")
 		master.wm_iconbitmap('icons/fingerprint.ico')
 		
-		self.frame_1 = tk.Frame(self.master, width=680)#grid(row=0,column=0, columnspan=5)#pack(padx=5, pady=5)
-		self.frame_2 = tk.Frame(self.master, width=680)#grid(row=1,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
-		self.frame_3 = tk.Frame(self.master, width=680)#grid(row=2,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
-		self.frame_4 = tk.Frame(self.master, width=680)#grid(row=2,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
+		self.frame_1 = tk.Frame(self.master)#grid(row=0,column=0, columnspan=5)#pack(padx=5, pady=5)
+		self.frame_1p5 = tk.Frame(self.master)#grid(row=1,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
+		self.frame_2 = tk.Frame(self.master)#grid(row=1,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
+		self.frame_3 = tk.Frame(self.master)#grid(row=2,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
+		self.frame_4 = tk.Frame(self.master, width=600)#grid(row=2,column=0, columnspan=5)#pack(fill=X, padx=5, pady=5)
 		
 		# Some styles
 		self.style = ttk.Style(self.master)
@@ -80,7 +82,7 @@ class tkstuff:
 		self.style.configure("RED.TLabel", foreground="#AA0000")# Reddish
 		
 		# Directory listbox
-		self.directorylb = tk.Listbox(self.frame_1, height=5, width=30, selectmode=tk.MULTIPLE)
+		self.directorylb = tk.Listbox(self.frame_1, height=5, width=30, selectmode=tk.MULTIPLE, exportselection=False)
 
 		# Test dropdown
 		self.om_v_capture = tk.StringVar()
@@ -107,10 +109,10 @@ class tkstuff:
 		self.var_thresh_sb.set("3.0") # Stupid dirty hack ends. Sets the default centroids value to 8.
 				
 		self.statusLabel = ttk.Label(self.frame_4,textvariable=self.statusString,font=("Arial", 14),style="GR.TLabel")
-		self.statusLabel.grid(row=0,column=1, columnspan=5, sticky=tk.N)
+		self.statusLabel.grid(row=1,column=1, columnspan=100, sticky="ew")
 				
 		# Progressbar for displaying 
-		self.pb = ttk.Progressbar(self.frame_3,orient=tk.HORIZONTAL, length=200, mode='determinate')
+		self.pb = ttk.Progressbar(self.frame_3,orient=tk.HORIZONTAL, length=150, mode='determinate')
 		self.percentage = tk.StringVar()
 		self.candidate = tk.StringVar()
 		
@@ -1055,21 +1057,22 @@ def trainingCallback():
 	tkc.statusString.set("Done training!")
 	if is_first_time==True:
 		is_first_time=False
-		ttk.Button(tkc.frame_1, compound=tk.LEFT,image=tkc.quantIcon,   text="   Show quantizations   ", command=showQuantizations).grid(row=0,column=8, rowspan=2, columnspan=2, sticky=tk.E)
-		ttk.Button(tkc.frame_1, compound=tk.LEFT,image=tkc.histoIcon,   text="     Show histogram     ", command=showHistogram).grid(row=0,column=10, rowspan=2, columnspan=2, sticky=tk.E)
-		ttk.Button(tkc.frame_1, compound=tk.LEFT,image=tkc.wolframIcon, text="   Fingerprint graphs    ", command=showGraphCallback).grid(row=1, rowspan=2, column=8, columnspan=2, sticky=tk.E+tk.S)
-		ttk.Button(tkc.frame_1, compound=tk.LEFT,image=tkc.csvIcon,     text="Export fingerprint CSVs", command=exportCSVs).grid(row=1, rowspan=2, column=10, columnspan=2, sticky=tk.E+tk.S)
-		ttk.Label(tkc.frame_2,text="Capture: ",font=("Arial", 11),style="GR.TLabel").grid(row=0,column=0, columnspan=5, sticky=tk.N+tk.W)
-		tkc.om_capture.grid(row=1,column=0,columnspan=5, rowspan=1, sticky=tk.W+tk.E)
-		ttk.Label(tkc.frame_2,text="Fingerprint: ",font=("Arial", 11),style="GR.TLabel").grid(row=0,column=8, columnspan=5, sticky=tk.N+tk.W)
-		tkc.om_fp.grid(row=1,column=8,columnspan=5, rowspan=1, sticky=tk.W+tk.E)
-		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Analyze just this fingerprint ", command=testCallback).grid(row=1, column=14, columnspan=4, sticky=tk.E)
-		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Compare capture w/all fingerprints ", command=testAllCallback).grid(row=2, column=1, columnspan=4, sticky=tk.W+tk.E)
-		ttk.Label(tkc.frame_3,text="Analysis result: ",font=("Arial",14)).grid(row=0,column=0,sticky=tk.W)
-		ttk.Label(tkc.frame_3,text=" Tree-Distance (KL) method: ",font=("Arial",11)).grid(row=1,column=0, columnspan=3)
-		tkc.pb.grid(row=1,column=4,sticky=tk.E)
-		ttk.Label(tkc.frame_3,textvariable=tkc.percentage,font=("Arial",10)).grid(row=1,column=6, columnspan=1,sticky=tk.E)
-		ttk.Label(tkc.frame_3,textvariable=tkc.candidate,font=("Arial",9)).grid(row=1,column=8, columnspan=2,sticky=tk.E)
+		ttk.Button(tkc.frame_1p5, compound=tk.LEFT,image=tkc.quantIcon,   text="Show quantizations", command=showQuantizations, width=20).grid(row=0,column=0, rowspan=1, columnspan=2,padx=15, pady=3, sticky=tk.E)
+		ttk.Button(tkc.frame_1p5, compound=tk.LEFT,image=tkc.histoIcon,   text="Show histogram", command=showHistogram, width=20).grid(row=0,column=3, rowspan=1, pady=3, columnspan=2, sticky=tk.E)
+		ttk.Button(tkc.frame_1p5, compound=tk.LEFT,image=tkc.wolframIcon, text="Fingerprint graphs", command=showGraphCallback, width=20).grid(row=1, rowspan=1, column=0, columnspan=2, padx=15, pady=3, sticky=tk.E+tk.S)
+		ttk.Button(tkc.frame_1p5, compound=tk.LEFT,image=tkc.csvIcon,     text="Export fingerprint CSVs", command=exportCSVs, width=20).grid(row=1, rowspan=1, column=3, columnspan=2, pady=3, sticky=tk.E+tk.S)
+		ttk.Label(tkc.frame_2,text="Capture: ",font=("Arial", 11),style="GR.TLabel").grid(row=0,column=0, padx=3,columnspan=2, sticky=tk.N+tk.W)
+		tkc.om_capture.grid(row=0,column=3,columnspan=5, rowspan=1, sticky=tk.W)
+		ttk.Label(tkc.frame_2,text="Fingerprint: ",font=("Arial", 11),style="GR.TLabel").grid(row=2,column=0, padx=3,columnspan=2, sticky=tk.N+tk.W)
+		tkc.om_fp.grid(row=2,column=3,columnspan=5, rowspan=1, sticky=tk.W)
+		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Analyze just this fingerprint ", command=testCallback).grid(row=1, column=0,  padx=15, pady=3, columnspan=5, sticky=tk.W)
+		ttk.Button(tkc.frame_2,compound=tk.LEFT,image=tkc.testIcon,text=" Compare capture w/all fingerprints ", command=testAllCallback).grid(row=3, column=0, padx=15, pady=3, columnspan=5, sticky=tk.W)
+		ttk.Separator(tkc.frame_3,orient=tk.HORIZONTAL).grid(row=0,columnspan=100,sticky="ew")
+		ttk.Label(tkc.frame_3,text="Analysis result: ",font=("Arial",14)).grid(row=1,column=0,sticky=tk.W)
+		ttk.Label(tkc.frame_3,text=" Tree-Distance (KL) method: ",font=("Arial",11)).grid(row=2,column=0, columnspan=3)
+		tkc.pb.grid(row=2,column=4,sticky=tk.E)
+		ttk.Label(tkc.frame_3,textvariable=tkc.percentage,font=("Arial",10)).grid(row=2,column=6, columnspan=1,sticky=tk.E)
+		ttk.Label(tkc.frame_3,textvariable=tkc.candidate,font=("Arial",9)).grid(row=3,column=4, columnspan=2,sticky=tk.E)
 	tkc.updateFingerprints([n.tag for n in fp_db])
 
 def showHistogram():
@@ -1116,7 +1119,7 @@ def findFpByTag(tag):
 	return False
 
 def testCallback():
-	global tkc
+	global tkc, is_first_analysis
 	tkc.statusLabel.config(style="MUST.TLabel")
 	tkc.statusString.set("Working - Please wait...")
 	fileToCompare = tkc.om_v_capture.get()
@@ -1139,12 +1142,20 @@ def testCallback():
 
 	tkc.graphs[1] = os.path.join(getcwd(),"wolfram_graphs",logloss_file_name)
 	tkc.graphs[2] = os.path.join(getcwd(),"wolfram_graphs",hammingloss_file_name)
-	tkc.button_hammingloss.grid(row=3,column=2, columnspan=2, sticky=tk.E)
-	tkc.button_logloss.grid(row=3,column=4, columnspan=2, sticky=tk.W)
+	tkc.button_hammingloss.grid(row=4,column=2, columnspan=2, sticky=tk.E)
+	tkc.button_logloss.grid(row=4,column=4, columnspan=2, sticky=tk.W)
 	tkc.candidate.set("")
 	tkc.statusLabel.config(style="GR.TLabel")
+	packFrame3()	
 	tkc.statusString.set("Ready...")
 
+def packFrame3():
+	global tkc, is_first_analysis
+	if is_first_analysis==True:
+		tkc.frame_3.pack(fill="both", expand=True, padx=5, anchor="center")
+		is_first_anlysis = False
+	
+	
 def testAllCallback():
 	global tkc
 	tkc.statusLabel.config(style="MUST.TLabel")
@@ -1170,10 +1181,10 @@ def testAllCallback():
 	thresh = float(tkc.thresh_sb.get())
 	printBarGraphs(l1, "Capture "+fileToCompare+" with all fingerprints", l2, "", fp_names, file_name,0,thresh)
 	tkc.graphs[0] = file_name
-	tkc.button_bargraph.grid(row=3,column=0, columnspan=2, sticky=tk.E)
+	tkc.button_bargraph.grid(row=4,column=0, columnspan=2, sticky=tk.E)
 	setPercentage(min_val,thresh)
 	tkc.candidate.set("Most likely "+min_name)
-	
+	packFrame3()
 	tkc.statusLabel.config(style="GR.TLabel")
 	tkc.statusString.set("Ready...")
 	
@@ -1214,17 +1225,19 @@ def main():
 	tkc.thresh_sb.config(width=4)
 	tkc.thresh_sb.grid(row=2, column=4,padx=2,sticky=tk.W+tk.N)
 	
-	b = ttk.Button(tkc.frame_1,compound=tk.LEFT,image=tkc.trainIcon,text="Start Training" , command=trainingCallback)
-	b.grid(row=0,column=5,rowspan=3,columnspan=2,sticky=tk.W,padx=10)#pack(side=tk.BOTTOM)
+	b = ttk.Button(tkc.frame_1,compound=tk.TOP,image=tkc.trainIcon,text="Start Training" , command=trainingCallback, width=13)
+	b.grid(row=0,column=5,rowspan=5,columnspan=4,sticky="ew",padx=5)#pack(side=tk.BOTTOM)
 	
-	ttk.Label(tkc.frame_4,text="Status:",font=("Arial", 14)).grid(row=0, column=0, sticky=tk.N)
+	ttk.Separator(tkc.frame_4,orient=tk.HORIZONTAL).grid(pady=5,row=0,columnspan=100,sticky="ew")
+	ttk.Label(tkc.frame_4,text="Status:",font=("Arial", 14)).grid(row=1, column=0)
 	
 	tkc.statusString.set("Ready...")
 	ttk.Label(tkc.master,text="Traffic Fingerprint",font=("Arial", 16)).pack(padx=5, pady=5, anchor=tk.NW)
-	tkc.frame_1.pack(fill="x", expand=True, padx=5, pady=2,anchor=tk.N)
-	tkc.frame_2.pack(fill="x", expand=True, padx=5, pady=2)
-	tkc.frame_3.pack(fill="x", expand=True, padx=5, pady=2)
-	tkc.frame_4.pack(fill="x", expand=True, padx=5, pady=2,anchor=tk.S)
+	tkc.frame_1.pack(fill="x", padx=5, pady=2, anchor=tk.N)
+	tkc.frame_4.pack(fill="x",  padx=5, pady=2, anchor=tk.N)
+	tkc.frame_1p5.pack(fill="x",  padx=5, anchor=tk.N)
+	tkc.frame_2.pack(fill="x", padx=5, pady=5, anchor=tk.N)
+	
 	tkc.master.mainloop()
 	
 
