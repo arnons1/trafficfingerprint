@@ -28,6 +28,7 @@
 *.sql
 *.sqlite
 *.csv
+*.nb
  
 # OS generated files #
 ######################

@@ -63,7 +63,7 @@ class tkstuff:
 	def __init__(self, master, codebook_default="12"):
 		self.master=master
 		
-		self.master.geometry('520x580+100+50') # set new geometry
+		self.master.geometry('520x610+100+50') # set new geometry
 		master.title("Traffic Fingerprinting")
 		master.wm_iconbitmap('icons/fingerprint.ico')
 		
@@ -77,7 +77,7 @@ class tkstuff:
 		self.style = ttk.Style(self.master)
 		self.style.configure("BW.TLabel", foreground="#000000")# Black
 		self.style.configure("BW.TOptionMenu",foreground="#000000")# Black on White
-		self.style.configure("GR.TLabel", foreground="#00AA00")# Greenish
+		self.style.configure("GR.TLabel", foreground="#85ae00")# Greenish
 		self.style.configure("MUST.TLabel", foreground="#AAAA00")# Mustard colour
 		self.style.configure("RED.TLabel", foreground="#AA0000")# Reddish
 		
@@ -118,9 +118,9 @@ class tkstuff:
 		
 		# Icons
 		self.histoIcon = tk.PhotoImage(file="icons/histogram.gif")
-		self.trainIcon = tk.PhotoImage(file="icons/train.gif")
+		self.trainIcon = tk.PhotoImage(file="icons/train2.gif")
 		self.quantIcon = tk.PhotoImage(file="icons/quantization.gif")
-		self.testIcon = tk.PhotoImage(file="icons/test.gif")
+		self.testIcon = tk.PhotoImage(file="icons/test2.gif")
 		self.wolframIcon = tk.PhotoImage(file="icons/wolfram.gif")
 		self.csvIcon = tk.PhotoImage(file="icons/csv.gif")
 

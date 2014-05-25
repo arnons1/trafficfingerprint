@@ -1,6 +1,0 @@
-l1={6.2452284283579065,8.922492222476828,7.500665675483839,9.07410505077893,11.80710519082009,10.016541159242191,9.791548820567316,26.443266150885908,13.061171883715003,25.865650473920834,17.62045934018961,11.805081347560265,12.75308876611531,12.994782085230243,12.994782085230243,5.436759468254717,4.908635184493453,6.330932317050587,5.708935513375809};
-r0=BarChart[l1,  BarOrigin->Left,LabelingFunction->Left,GridLines->{{},Range[5,55,5]}, ChartLabels -> Placed[
-{"Bladabindi_alpha_1","Bladabindi_alpha_2","Bladabindi_alpha_3","cryptlocker_alpha_1","cryptlocker_alpha_2","cryptlocker_alpha_3","cryptlocker_alpha_4","cryptlocker_beta_1","cryptlocker_beta_2","cryptlocker_beta_3","cryptlocker_beta_4","cryptlocker_gamma_1","cryptlocker_gamma_2","Darkcomet_alpha_1","Darkcomet_alpha_2","Hesperbor_beta_1","Hesperbor_beta_2","Hesperbor_beta_3","Renovator_gamma_1"}
-,Axis,Rotate[#,0]&],ChartStyle -> "Pastel", PlotLabel -> "Capture bbc.pcap with all fingerprints", 
-ChartElementFunction->ChartElementDataFunction["SegmentScaleRectangle","Segments"->250,"ColorScheme"->"Pastel"]];r1 = Graphics[{Red, Thick, Line[{{3.00, 0}, {3.00, Length[l1] + 1}}]}];
-Show[r0,r1,Background->None]
