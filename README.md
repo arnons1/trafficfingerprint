@@ -1,4 +1,4 @@
-trafficfingerprint
+:space_invader: trafficfingerprint :space_invader:
 ==================
 This should run on Win32/64 and *nix variants.
 
@@ -14,7 +14,7 @@ Prerequisites:
 ==============
 The order for the installation is rather important, try to follow it.
 
-* [Python 3.3 with Tkinter and ttk](http://www.python.org/ftp/python/3.3.5/python-3.3.5.amd64.msi)
+* :snake: [Python 3.3 with Tkinter and ttk](http://www.python.org/ftp/python/3.3.5/python-3.3.5.amd64.msi)
 * [Numpy (For math calculations)](http://www.lfd.uci.edu/~gohlke/pythonlibs/tid72nv9/numpy-MKL-1.8.1.win-amd64-py3.3.exe)
 * [Scipy (For scalar quantization)](http://www.lfd.uci.edu/~gohlke/pythonlibs/tid72nv9/scipy-0.14.0c1.win-amd64-py3.3.exe)
 * dpkt (For PCAP file parsing - patched version for 3.3 is in the prerequisites folder - copy to C:\Python33\Lib\site-packages\dpkt)
@@ -36,22 +36,25 @@ After installing ALL OF THE PREREQUISITES, clone the repository by running
 git clone https://github.com/arnons1/trafficfingerprint.git
 ```
 
-Running
+:running: Running
 =======
 In your shell, run
 ```bash
 python tree.py
 ```
 The UI should open.
-![Basic UI](https://raw.githubusercontent.com/arnons1/trafficfingerprint/master/screenshots/Screenshot%202014-05-31%2015.37.37.png)
+![Basic UI](https://raw.githubusercontent.com/arnons1/trafficfingerprint/master/screenshots/Screenshot%202014-05-31%2015.37.37.png =300x)
 
 Pick the desired directories for training and hit "Start Training".
 
 When training is done, more buttons should appear with various actions.
-![UI with more buttons](https://raw.githubusercontent.com/arnons1/trafficfingerprint/master/screenshots/Screenshot%202014-05-31%2015.37.44.png)
+![UI with more buttons](https://raw.githubusercontent.com/arnons1/trafficfingerprint/master/screenshots/Screenshot%202014-05-31%2015.37.44.png =300x)
+
+:microscope: Testing
+======
 
 Selecting a capture, you can pick "Compare capture w/all fingerprints" to receive a general analysis, showing the most probable match.
-![UI with more buttons](https://raw.githubusercontent.com/arnons1/trafficfingerprint/master/screenshots/Screenshot%202014-05-31%2015.37.55.png)
+![UI with more buttons](https://raw.githubusercontent.com/arnons1/trafficfingerprint/master/screenshots/Screenshot%202014-05-31%2015.37.55.png =300x)
 
 If you wish to run a test against a specific fingerprint, choose that fingerprint from the second dropdown, and pick "Analyze just this fingerprint"
 
