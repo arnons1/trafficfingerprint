@@ -54,7 +54,7 @@ When training is done, more buttons should appear with various actions.
 ======
 
 Selecting a capture, you can pick "Compare capture w/all fingerprints" to receive a general analysis, showing the most probable match.
-![UI with more buttons](./screenshots/Screenshot%202014-05-31%2015.37.55.png =300x)
+<img src="./screenshots/Screenshot%202014-05-31%2015.37.55.png" style="width: 300px" />
 
 If you wish to run a test against a specific fingerprint, choose that fingerprint from the second dropdown, and pick "Analyze just this fingerprint"
 
