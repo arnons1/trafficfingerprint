@@ -63,7 +63,7 @@ class tkstuff:
 	def __init__(self, master, codebook_default="12"):
 		self.master=master
 		
-		self.master.geometry('520x680+100+50') # set new geometry
+		self.master.geometry('520x700+100+50') # set new geometry
 		master.title("Traffic Fingerprinting")
 		master.wm_iconbitmap('icons/fingerprint.ico')
 		
@@ -115,6 +115,8 @@ class tkstuff:
 		self.pb = ttk.Progressbar(self.frame_3,orient=tk.HORIZONTAL, length=150, mode='determinate')
 		self.percentage = tk.StringVar()
 		self.candidate = tk.StringVar()
+		self.next_candidate = tk.StringVar()
+		self.next_candidate.set("\n\n")
 		
 		# Icons
 		self.histoIcon = tk.PhotoImage(file="icons/histogram.gif")
@@ -130,6 +132,7 @@ class tkstuff:
 		self.button_bargraph = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.barchartIcon,   text="All fingerprints", command=showBarGraph)
 		self.button_logloss = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="Log Loss", command=showLogLossGraph)
 		self.button_hammingloss = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="Hamming Loss", command=showHammingLossGraph)
+		
 
 		
 	def updateFingerprints(self,optionList=[]):
@@ -785,9 +788,8 @@ def compareFingerprintWithLZListLL(fp, lzlist, window_size):
 		epsilon = 1e-15
 		pred = sp.maximum(epsilon, nodeProb)
 		pred = sp.minimum(1-epsilon, pred)
-		#ll = log_loss([listElem],[[nodeProb,1-nodeProb]])
-		ll2 = - math.log(pred)
-		totalLogLoss += ll2
+		log_loss_r = - math.log(pred)
+		totalLogLoss += log_loss_r
 	return -(totalLogLoss)/(window_size*math.log(epsilon))
 
 #===============================================================================
@@ -982,7 +984,7 @@ def training(dir_list = ['training_1'], codebook_size = 8):
 		decision_boundaries.append((centroids[i]+centroids[i-1])*0.5)
 		i+=1
 	for file in pcaps_filelist_for_training: # Add fingerprints to fp_db
-		t = generateTreeFromString(parsePcapAndGetQuantizedString(file,150))
+		t = generateTreeFromString(parsePcapAndGetQuantizedString(file))
 		filename = (file.split('\\')[-1]).split('.')[0]
 		fp_db.append(fingerprint(filename,t))
 
@@ -1074,6 +1076,7 @@ def trainingCallback():
 		tkc.pb.grid(row=2,column=4,sticky=tk.E)
 		ttk.Label(tkc.frame_3,textvariable=tkc.percentage,font=("Arial",10)).grid(row=2,column=6, columnspan=1,sticky=tk.E)
 		ttk.Label(tkc.frame_3,textvariable=tkc.candidate,font=("Arial",9)).grid(row=3,column=4, columnspan=3,sticky=tk.W)
+		ttk.Label(tkc.frame_3,textvariable=tkc.next_candidate,font=("Arial",9)).grid(row=4,column=0, columnspan=7,sticky=tk.W)
 	tkc.updateFingerprints([n.tag for n in fp_db])
 
 def showHistogram():
@@ -1097,7 +1100,6 @@ def showLogLossGraph():
 	call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", tkc.graphs[1]])
 
 def showHammingLossGraph():
-	print("Address is "+tkc.graphs[2])
 	call(["c:\Program Files\Wolfram Research\Mathematica\9.0\Mathematica.exe", tkc.graphs[2]])
 
 def showBarGraph():
@@ -1125,7 +1127,7 @@ def testCallback():
 	tkc.statusString.set("Working - Please wait...")
 	fileToCompare = tkc.om_v_capture.get()
 	fp = tkc.om_v_fp.get()
-	capture_string = parsePcapAndGetQuantizedString(fileToCompare,1000,'test')
+	capture_string = parsePcapAndGetQuantizedString(fileToCompare,0,'test')
 	capture_tree = generateTreeFromString(capture_string)
 	tstr = "::Fingerprint: "+fp+" :::: Capture: "+fileToCompare+"::\n"
 	tstr += "Centroids: %s\n==========================\n"%centroids
@@ -1143,9 +1145,10 @@ def testCallback():
 
 	tkc.graphs[1] = os.path.join(getcwd(),"wolfram_graphs",logloss_file_name)
 	tkc.graphs[2] = os.path.join(getcwd(),"wolfram_graphs",hammingloss_file_name)
-	tkc.button_hammingloss.grid(row=4,column=2, columnspan=2, sticky=tk.E)
-	tkc.button_logloss.grid(row=4,column=4, columnspan=2, sticky=tk.W)
+	tkc.button_hammingloss.grid(row=5,column=2, columnspan=2, sticky=tk.E)
+	tkc.button_logloss.grid(row=5,column=4, columnspan=2, sticky=tk.W)
 	tkc.candidate.set("")
+	tkc.next_candidate.set("\n\n")
 	tkc.statusLabel.config(style="GR.TLabel")
 	packFrame3()	
 	tkc.statusString.set("Ready...")
@@ -1162,7 +1165,8 @@ def testAllCallback():
 	tkc.statusLabel.config(style="MUST.TLabel")
 	tkc.statusString.set("Working - Please wait...")
 	fileToCompare = tkc.om_v_capture.get()
-	capture_string = parsePcapAndGetQuantizedString(fileToCompare,1000,'test')
+	thresh = float(tkc.thresh_sb.get())
+	capture_string = parsePcapAndGetQuantizedString(fileToCompare,0,'test')
 	capture_tree = generateTreeFromString(capture_string)
 	l1 = []
 	l2 = []
@@ -1173,25 +1177,46 @@ def testAllCallback():
 #		l2.append(compareTreesByLevel(dbi.tree, capture_tree))
 		fp_names.append('"'+dbi.tag+'"')
 	
-	min_val = l1[0]
-	min_name = fp_names[0]
-	for i in range(len(l1)):
-		if l1[i] < min_val:
-			min_val = l1[i]
-			min_name = fp_names[i]
-	thresh = float(tkc.thresh_sb.get())
+	#min_val = l1[0]
+	#min_name = fp_names[0]
+	#for i in range(len(l1)):
+	#	if l1[i] < min_val:
+	#		min_val = l1[i]
+	#		min_name = fp_names[i]
+	mins = sorted(zip(l1,fp_names))
+	(min_val,min_name) = mins[0]
+	candidates = []
+	for i in range(len(mins)):
+		(min_val1,min_name1) = mins[i]
+		if getPercentage(min_val1,thresh)+10>getPercentage(min_val) and min_name1 != min_name:
+			candidates.append(mins[i])
+		if len(candidates)>2:
+			break
+	
 	printBarGraphs(l1, "Capture "+fileToCompare+" with all fingerprints", l2, "", fp_names, file_name,0,thresh)
 	tkc.graphs[0] = file_name
-	tkc.button_bargraph.grid(row=4,column=0, columnspan=2, sticky=tk.E)
+	tkc.button_bargraph.grid(row=5,column=0, columnspan=2, sticky=tk.E)
 	setPercentage(min_val,thresh)
 	tkc.candidate.set("Most likely "+min_name)
+	temp_str=""
+	for i in range(len(candidates)):
+		(v,n) = candidates[i]
+		temp_str += ("\t\t\t%s with %3.2f,\n"%(n,getPercentage(v,thresh)))
+	if len(candidates)>0:
+		tkc.next_candidate.set("Additional candidates:\t"+temp_str[3:-2])
+	else:
+		tkc.next_candidate.set("No additional candidates\n\n")
 	packFrame3()
 	tkc.statusLabel.config(style="GR.TLabel")
 	tkc.statusString.set("Ready...")
 	
-def setPercentage(val,thresh=3.0):
+def getPercentage(val,thresh=3.0):
 	percentage = min(1,(val / (2*thresh))) # 2*thresh works well for percentages
 	percentage = (1-percentage)*100
+	return percentage
+
+def setPercentage(val,thresh=3.0):
+	percentage = getPercentage(val,thresh)
 	tkc.percentage.set("%3.2f"%(percentage)+"%")
 	tkc.pb.stop()
 	if percentage==100:
