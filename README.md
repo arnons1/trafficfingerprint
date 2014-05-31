@@ -43,15 +43,15 @@ In your shell, run
 python tree.py
 ```
 The UI should open.
-![Basic UI](https://github.com/arnons1/trafficfingerprint/tree/master/screenshots/Screenshot 2014-05-31 15.37.37.png)
+![Basic UI](https://raw.githubusercontent.com/arnons1/trafficfingerprint/master/screenshots/Screenshot%202014-05-31%2015.37.37.png)
 
 Pick the desired directories for training and hit "Start Training".
 
 When training is done, more buttons should appear with various actions.
-![UI with more buttons](https://github.com/arnons1/trafficfingerprint/tree/master/screenshots/Screenshot 2014-05-31 15.37.44.png)
+![UI with more buttons](https://raw.githubusercontent.com/arnons1/trafficfingerprint/master/screenshots/Screenshot%202014-05-31%2015.37.44.png)
 
 Selecting a capture, you can pick "Compare capture w/all fingerprints" to receive a general analysis, showing the most probable match.
-![UI with more buttons](https://github.com/arnons1/trafficfingerprint/tree/master/screenshots/Screenshot 2014-05-31 15.37.55.png)
+![UI with more buttons](https://raw.githubusercontent.com/arnons1/trafficfingerprint/master/screenshots/Screenshot%202014-05-31%2015.37.55.png)
 
 If you wish to run a test against a specific fingerprint, choose that fingerprint from the second dropdown, and pick "Analyze just this fingerprint"
 
