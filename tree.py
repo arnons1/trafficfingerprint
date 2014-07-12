@@ -133,8 +133,6 @@ class tkstuff:
 		self.button_logloss = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="Log Loss", command=showLogLossGraph)
 		self.button_hammingloss = ttk.Button(self.frame_3, compound=tk.LEFT,image=self.wolframIcon,   text="Hamming Loss", command=showHammingLossGraph)
 		
-
-		
 	def updateFingerprints(self,optionList=[]):
 		self.om_v_fp.set('')
 		self.om_fp['menu'].delete(0, 'end')
@@ -1228,12 +1226,12 @@ def setPercentage(val,thresh=3.0):
 #===============================================================================	
 def main():
 	global tkc
-	tkc = tkstuff(tk.Tk(),"25") # Start up TK
+	tkc = tkstuff(tk.Tk(),"25") # Start up TK with 25 as the default number of centroids
 
-	captures_list = findAllPcapFiles('test')
+	captures_list = findAllPcapFiles('test') # All PCAPs from the 'test' directory
 	for i in range(len(captures_list)):
 		captures_list[i] = captures_list[i].split('\\')[-1]
-	tkc.updateCaptures(captures_list)
+	tkc.updateCaptures(captures_list) # Place them in the dropdown box
 	
 	ttk.Label(tkc.frame_1,text="Pick directories to perform training on from below: ").grid(row=0, column=0, columnspan=8, sticky=tk.W)
 	i=0
@@ -1242,11 +1240,12 @@ def main():
 			list_of_dirs.append(x[0][2:])
 			tkc.directorylb.insert(i,x[0][2:])
 			i+=1
-	tkc.directorylb.grid(row=1, column=0, columnspan=2, rowspan=3, padx=15, pady=3, sticky=tk.N)#pack(side=tk.TOP)
+	tkc.directorylb.grid(row=1, column=0, columnspan=2, rowspan=3, padx=15, pady=3, sticky=tk.N)
+	# Centroid spinbox
 	ttk.Label(tkc.frame_1,text="Centroids ",font=("Arial", 11),style="BW.TLabel").grid(row=1,column=3,padx=2,sticky=tk.E)
 	tkc.centroid_sb.config(width=3)
 	tkc.centroid_sb.grid(row=1, column=4,padx=2,sticky=tk.W)
-	
+	# Threshold spinbox
 	ttk.Label(tkc.frame_1,text="Threshold ",font=("Arial", 11),style="BW.TLabel").grid(row=2,column=3,padx=2,sticky=tk.E+tk.N)
 	tkc.thresh_sb.config(width=4)
 	tkc.thresh_sb.grid(row=2, column=4,padx=2,sticky=tk.W+tk.N)
