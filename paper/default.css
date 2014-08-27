@@ -1,0 +1,78 @@
+/* $Id: default.css 411 2008-01-20 22:50:25Z ringler $
+ * CSS style sheet for html created with XSLT from bibxml
+ */
+ /*
+ * Copyright (c) 2003-2008 Moritz Ringler
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ */
+body {
+   background: rgb(224,238,238);
+}
+div.bibtexml-output p {
+  margin: 0px;
+  padding: 0px;
+  width: 40em;
+}
+a {
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+address {
+  margin-top: 2em;
+}
+table {
+  empty-cells: show;
+  width: 100%;
+}
+th {
+  text-align: left;
+  font-size: 10pt;
+  font-family: Helvetica, Arial, sans-serif;
+}
+td {
+  text-align:left;
+  vertical-align:top;
+  font-size: 10pt;
+  font-family: Helvetica, Arial, sans-serif;
+  padding: 6pt;
+  border-top: solid silver 1px
+}
+td.author {
+  width: 10em;
+}
+td.citekey {
+ width: 5em;
+}
+td.ref {
+  width: 20em;
+}
+td.year {
+  width: 3em;
+}
+td.title{
+  cursor:pointer;
+}
+span.vol {
+  font-weight:bold
+}
+.abstract{
+    padding:5pt;
+    background-color:#ffffff;
+    font-family: Palatino, serif;
+    font-size: 10pt;
+    font-style: oblique;
+}

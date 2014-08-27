@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<bibtex:file xmlns:bibtex="http://bibtexml.sf.net/">
+
+
+
+   <bibtex:entry id="Art07">
+      <bibtex:article>
+         <bibtex:author>David Arthur and Sergei Vassilvitskii</bibtex:author>
+
+         <bibtex:title>k-means+: The advantages of careful seeding</bibtex:title>
+
+         <bibtex:journal>Proceedings of the eighteens annual ACM-SIAM symposium on Discrete algorithms</bibtex:journal>
+         <bibtex:publisher>Society for Industrial and Applied Mathematics</bibtex:publisher>
+         <bibtex:year>2007</bibtex:year>
+
+
+
+         <bibtex:pages>1027–1035</bibtex:pages>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      </bibtex:article>
+   </bibtex:entry>
+   <bibtex:entry id="EMS13">
+      <bibtex:electronic>
+         <bibtex:author>EMSISoft Blog</bibtex:author>
+
+         <bibtex:title>CryptoLocker – a new ransomware variant</bibtex:title>
+
+
+
+         <bibtex:year>2013</bibtex:year>
+
+         <bibtex:month>September</bibtex:month>
+
+
+
+
+
+
+         <bibtex:organization>EMSISoft Blog</bibtex:organization>
+
+
+
+
+         <bibtex:url>http://blog.emsisoft.com/2013/09/10/cryptolocker-a-new-ransomware-variant/</bibtex:url>
+
+
+
+
+
+
+
+
+
+
+
+
+      </bibtex:electronic>
+   </bibtex:entry>
+   <bibtex:entry id="Coh12">
+      <bibtex:techreport>
+         <bibtex:author>Asaf Cohen and Shlomi Dolev and Niv Gilboa and Guy Leshem</bibtex:author>
+
+         <bibtex:title>Anomaly Detection, Dependence Analysis and</bibtex:title>
+
+
+
+         <bibtex:year>2012</bibtex:year>
+
+
+
+
+
+
+
+         <bibtex:institution>Ben Gurion University of the Negev</bibtex:institution>
+
+
+         <bibtex:address>Beersheba,</bibtex:address>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      </bibtex:techreport>
+   </bibtex:entry>
+   <bibtex:entry id="MFe92">
+      <bibtex:article>
+         <bibtex:author>Meir Feder and Neri Merhav and Michael Gutman</bibtex:author>
+
+         <bibtex:title>Universal prediction of individual sequences</bibtex:title>
+
+         <bibtex:journal>IEEE Transactions on Information Theory</bibtex:journal>
+
+         <bibtex:year>1992</bibtex:year>
+         <bibtex:volume>38</bibtex:volume>
+         <bibtex:month>July</bibtex:month>
+
+         <bibtex:pages>1258–1270</bibtex:pages>
+         <bibtex:number>4</bibtex:number>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      </bibtex:article>
+   </bibtex:entry>
+   <bibtex:entry id="Lan83">
+      <bibtex:article>
+         <bibtex:author>G.G., Jr Langdon</bibtex:author>
+
+         <bibtex:title>A note on the Ziv - Lempel model for compressing individual sequences (Corresp.)</bibtex:title>
+
+         <bibtex:journal>IEEE Transactions on Information Theory</bibtex:journal>
+
+         <bibtex:year>1983</bibtex:year>
+         <bibtex:volume>29</bibtex:volume>
+
+
+         <bibtex:pages>284–287</bibtex:pages>
+         <bibtex:number>2</bibtex:number>
+
+
+
+
+
+
+
+
+         <bibtex:url>http://ieeexplore.ieee.org/xpl/articleDetails.jsp?tp=&amp;arnumber=1056645&amp;url=http%3A%2F%2Fieeexplore.ieee.org%2Fxpls%2Fabs_all.jsp%3Farnumber%3D1056645</bibtex:url>
+
+
+
+
+
+
+
+
+
+
+
+
+      </bibtex:article>
+   </bibtex:entry>
+   <bibtex:entry id="Ham50">
+      <bibtex:article>
+         <bibtex:author>Richard W Hamming</bibtex:author>
+
+         <bibtex:title>Error detecting and error correcting codes</bibtex:title>
+
+         <bibtex:journal>Bell Systems technical journal</bibtex:journal>
+
+         <bibtex:year>1950</bibtex:year>
+         <bibtex:volume>29</bibtex:volume>
+
+
+         <bibtex:pages>147–160</bibtex:pages>
+         <bibtex:number>2</bibtex:number>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      </bibtex:article>
+   </bibtex:entry>
+   <bibtex:entry id="Kul51">
+      <bibtex:article>
+         <bibtex:author>Solomon Kullback and Richard Leibler</bibtex:author>
+
+         <bibtex:title>On Information and Sufficiency</bibtex:title>
+
+         <bibtex:journal>The Annals of Mathematical Statistics</bibtex:journal>
+
+         <bibtex:year>1951</bibtex:year>
+         <bibtex:volume>22</bibtex:volume>
+
+
+         <bibtex:pages>79–86</bibtex:pages>
+         <bibtex:number>1</bibtex:number>
+
+
+
+
+
+
+
+
+         <bibtex:url>http://projecteuclid.org/euclid.aoms/1177729694</bibtex:url>
+
+
+
+
+
+
+
+
+
+
+
+
+      </bibtex:article>
+   </bibtex:entry>
+   <bibtex:entry id="Lempel1978">
+      <bibtex:article>
+         <bibtex:author>Avraham Lempel and Jacob Ziv</bibtex:author>
+
+         <bibtex:title>Compression of individual sequences via variable-rate coding</bibtex:title>
+
+         <bibtex:journal>IEEE Transmissions on Information Theory</bibtex:journal>
+
+         <bibtex:year>1978</bibtex:year>
+
+         <bibtex:month>September</bibtex:month>
+
+         <bibtex:pages>530–536</bibtex:pages>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      </bibtex:article>
+   </bibtex:entry>
+   <bibtex:entry id="Nisenson2003">
+      <bibtex:article>
+         <bibtex:author>Mordechai Nisenson and Ido Yariv and Ran El-Yaniv and Ron Meir</bibtex:author>
+         <bibtex:editor>Nada Lavra?</bibtex:editor>
+         <bibtex:title>Towards Behaviometric Security Systems: Learning to Identify a Typist</bibtex:title>
+
+         <bibtex:journal>Knowledge Discovery in Databases: PKDD 2003, Lecture Notes in Computer Science</bibtex:journal>
+         <bibtex:publisher>Springer Berlin Heidelberg</bibtex:publisher>
+         <bibtex:year>2003</bibtex:year>
+         <bibtex:volume>2838</bibtex:volume>
+
+
+         <bibtex:pages>363–374</bibtex:pages>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      </bibtex:article>
+   </bibtex:entry>
+   <bibtex:entry id="Tso07">
+      <bibtex:article>
+         <bibtex:author>Grigorios Tsoumakas and Ioannis Katakis</bibtex:author>
+         <bibtex:editor>David Taniar</bibtex:editor>
+         <bibtex:title>Multi-label classification: An overview</bibtex:title>
+
+         <bibtex:journal>International Journal of Data Warehousing and Mining</bibtex:journal>
+
+         <bibtex:year>2007</bibtex:year>
+         <bibtex:volume>3</bibtex:volume>
+
+
+         <bibtex:pages>1–13</bibtex:pages>
+         <bibtex:number>3</bibtex:number>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      </bibtex:article>
+   </bibtex:entry>
+   <bibtex:entry id="Vil12">
+      <bibtex:article>
+         <bibtex:author>Nart Villeneuve and James Bennett</bibtex:author>
+
+         <bibtex:title>Detecting APT Activity with Network Traffic Analysis</bibtex:title>
+
+
+         <bibtex:publisher>Trend Micro Incorporated</bibtex:publisher>
+         <bibtex:year>2012</bibtex:year>
+
+
+
+
+
+
+
+
+
+
+
+
+
+         <bibtex:url>http://www. trendmicro.com/cloud-content/us/pdfs/securityintelligence/white-papers/wp-detecting-apt-activity-with-network-traffic-analysis.pdf</bibtex:url>
+
+
+
+
+
+
+
+
+
+
+
+
+      </bibtex:article>
+   </bibtex:entry>
+</bibtex:file>
