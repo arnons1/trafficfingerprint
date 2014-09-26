@@ -114,6 +114,7 @@
 % Wrapping around figures
 \usepackage{wrapfig}
 
+\def\NoNumber#1{{\def\alglinenumber##1{}\State #1}\addtocounter{ALG@line}{-1}}
 
 
 
@@ -705,11 +706,11 @@ The algorithm runs on two trees, where $T_{FP}$ is the fingerprint, while $T_U$ 
       \If{Exact matching node $m\in T_U$}
       	\State $q_i\gets$ probability of node $m$
       \Else
-      	\State $q_i\gets$ probability of closest node in $T_U$ (lexicographically)
+      	\State $q_i\gets$ probability of closest node in $T_U$ \NoNumber{(lexicographically)}
       	\State $q_i\gets q_i\cdot\varepsilon$\Comment{$\varepsilon$ is very small}
       \EndIf
-   \State$sum\gets
-   \log_k (p_i/q_i) \cdot {p_i}$\LONGCOMMENT{$k$ --- amount of centroids}
+   \State$sum\gets 
+   $sum+$ \log_k (p_i/q_i) \cdot {p_i}$\LONGCOMMENT{$k$ --- amount of centroids}
    \EndFor\label{euclidendwhile}
    \State \textbf{return} $sum$
 \EndProcedure
@@ -746,17 +747,19 @@ The fingerprints are stored in a local malware fingerprint database for easy acc
 \State ${GV}_O\gets[]; {GV}_C\gets[]$
 \State ${Database}\gets[]$
    \ForAll{Capture$_i\gets$Malware captures}
-   	\State \Call{AppendTo}{${GV}_O$,  [$\Delta_1,\Delta_2,...,\Delta_k$]}
+   	\State \Call{Append To}{${GV}_O\gets$[$\Delta_1,\Delta_2,...,\Delta_k$]}
    \EndFor
    \State ${GV}_C\gets$\Call{K-Means++}{${GV}_O$}
 
    \ForAll{Capture$_i\gets$Malware captures}
    	\State $V_i\gets\Delta_1,\Delta_2,...,\Delta_k$
    	\State Apply quantization transformation $
-   	\Delta  \Rightarrow {c^*}$ where ${c^*} = \mathop {\arg \min }\limits_{{c_i}} \left| {\Delta  - {c_i}} \right|$
-   	\State Map each quantized value  into a corresponding letter from the Latin alphabet ($a$,$b$,$c$,…)
-   	\State ${Tree}_i\gets$\Call{LZ78 Tree Generation}{ [$c_1$,$c_2$,$c_3$,...] as a string}
-    \State Append to ${Database}\gets{Tree}_i$ \label{alg:training:append_db}
+   	\Delta  \Rightarrow {c^*}$ 
+   	\NoNumber{where ${c^*} = \mathop {\arg \min }\limits_{{c_i}} \left| {\Delta  - {c_i}} \right|$}
+   	\State Map each quantized value  into a corresponding
+   	\NoNumber{letter from the Latin alphabet ($a$,$b$,$c$,...)}
+   	\State ${Tree}_i\gets$\Call{LZ78 Tree Generation}{ [$c_1$,$c_2$,$c_3$,...]}
+    \State \Call{Append to}${Database}\gets{Tree}_i$ \label{alg:training:append_db}
    \EndFor
    \State \textbf{return} $Database$
 \EndProcedure
@@ -777,7 +780,7 @@ Wireshark captures containing known malware were used, captured by a third-party
 The captures were identified by the third-party, and contained many varied traffic interspersed: UDP, TCP, HTTP, POP3 and ICMP to name a few.
 
 Captures from malware that communicates to remote machines via WAN were used.
-The captures used include malwares named Renovator (1 capture),  Cryptolocker (10 captures), Bladabindi (3 captures), DarkComet (2 captures) and Hesperbor (3 captures).
+The captures used include malwares named Renovator (1 capture),  Cryptolocker (10 captures), Bladabindi (3 captures), DarkComet (2 captures) and Hesperbot (3 captures).
 
 Some of the malware tested attempted to obscure itself as standard HTTP traffic (as described with Cryptolocker in section \ref{sec:malwaretraffic}), while some access other TCP ports.
 \subsubsection{Control dataset}
@@ -804,7 +807,7 @@ A lower result indicates that the distance between the unknown capture and the f
 
 Examining the \emph{Cryptolocker $\alpha$} test, the best matches are against other captures of Cryptolocker (See Table \ref{table:testresults} below), with the exception of Cryptolocker $\beta$ which exhibited slightly different behaviour.
 
-The \emph{Hesperbor} malware capture shows much better results when compared to other versions of the malware, with a distance metric smaller than $1$.
+The \emph{Hesperbot} malware capture shows much better results when compared to other versions of the malware, with a distance metric smaller than $1$.
 For the other fingerprints, the distance metric is much larger ($>3.0$).
 
 Empirically, it was established that results below $3.0$ represent a good match. In future works, this parameter can be used as a classifier rule for deciding if a capture contains malware traffic.
@@ -833,7 +836,7 @@ Empirically, it was established that results below $3.0$ represent a good match.
 % than the plain LaTeX2e tabular which is used here.
 \begin{tabular}{|p{1.56cm}|p{1.4cm}|p{1.3cm}|p{1.2cm}|p{1.4cm}|}
 \hline
-Fingerprint& \textbf{Cryptlocker $\alpha$ (raw)}&\textbf{Hesperbor (raw)}&\textbf{DozmotD}&\textbf{Spotify and IMAP}\\
+Fingerprint& \textbf{Cryptlocker $\alpha$ (raw)}&\textbf{Hesperbot (raw)}&\textbf{DozmotD}&\textbf{Spotify and IMAP}\\
 \hline
 Telnet&9.43&8.17&11.05&9.58\\
 \hline
@@ -851,11 +854,11 @@ Bitorrent &5.9 &9.11&9.96&5.52\\
 \hline
 Renovator $\gamma$ 1 &5.02&4.31&5.80&4.65\\
 \hline
-Hesperbor $\beta$ 3 &3.39&1.40&4.67&6.80\\
+Hesperbot $\beta$ 3 &3.39&1.40&4.67&6.80\\
 \hline
-Hesperbor $\beta$ 2 &3.47&1.69&4.98&5.45\\
+Hesperbot $\beta$ 2 &3.47&1.69&4.98&5.45\\
 \hline
-Hesperbor $\beta$ 1 &3.32&\textbf{0.44}&4.62&5.90\\
+Hesperbot $\beta$ 1 &3.32&\textbf{0.44}&4.62&5.90\\
 \hline
 Darkcomet $\alpha$ 2 &11.11&12.18&13.44&13.96\\
 \hline

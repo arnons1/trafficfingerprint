@@ -100,13 +100,13 @@ class tkstuff:
 		
 		# Spinbox for codebook size
 		self.var_centroid_sb = tk.StringVar(self.frame_1) # Hack begins
-		self.centroid_sb = spinbox.Spinbox(self.frame_1, from_=1, to=25,textvariable=self.var_centroid_sb)
-		self.var_centroid_sb.set(codebook_default) # Stupid dirty hack ends. Sets the default centroids value to 8.
+		self.centroid_sb = spinbox.Spinbox(self.frame_1, from_=2, to=50,textvariable=self.var_centroid_sb)
+		self.var_centroid_sb.set(codebook_default) # Stupid dirty hack ends. Sets the default centroids value to the default.
 		
 		# Spinbox for codebook size
 		self.var_thresh_sb = tk.StringVar(self.frame_1) # Hack begins
 		self.thresh_sb = spinbox.Spinbox(self.frame_1, from_=1.0, to=15.0, increment=0.5 ,textvariable=self.var_thresh_sb)
-		self.var_thresh_sb.set("3.0") # Stupid dirty hack ends. Sets the default centroids value to 8.
+		self.var_thresh_sb.set("3.0") # Stupid dirty hack ends. Sets the default threshold value
 				
 		self.statusLabel = ttk.Label(self.frame_4,textvariable=self.statusString,font=("Arial", 14),style="GR.TLabel")
 		self.statusLabel.grid(row=1,column=1, columnspan=100, sticky="ew")
@@ -526,10 +526,11 @@ def collectRelativeTimestampsForSingleFile(file):
 	frame_counter = 0
 	last_time = 0
 	vec = []
-	for ts, _buf in pcapReader:
+	for ts, buf in pcapReader:
 		frame_counter += 1
 		if frame_counter > 1 :
 			vec.append(ts - last_time) # Calculate relative timestamp and save
+                        #vec.append(len(buf)) # Would be interesting to use the buffer sizes instead
 		else:
 			vec.append(0) # First frame should have 0 as a timestamp
 		last_time = ts
@@ -577,12 +578,13 @@ def parsePcapAndGetQuantizedString(file,max_len=0,wd=''):
 	frame_counter = 0
 	last_time = 0
 	vector = []
-	for ts, _buf in pcapReader:
+	for ts, buf in pcapReader:
 		frame_counter += 1
 		if frame_counter > max_len and max_len>0:
 			break
 		if frame_counter > 1:
 			vector.append(getCodeFromCodebook(ts - last_time))
+                        #vector.append(getCodeFromCodebook(len(buf))) # Would be interesting to use the length of the packets at some point
 		else:
 			vector.append(getCodeFromCodebook(0))
 		last_time = ts
