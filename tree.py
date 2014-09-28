@@ -1,3 +1,5 @@
+#! python
+
 import os # For starting up Mathematica
 from subprocess import call
 from dpkt.pcap import Reader # Wireshark parsing
