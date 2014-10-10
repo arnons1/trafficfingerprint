@@ -68,7 +68,7 @@
 %
 % The Computer Society usually requires 12pt for submissions.
 %
-\documentclass[9pt,journal,compsoc]{IEEEtran}
+\documentclass[13pt,journal,compsoc,onecolumn]{IEEEtran}
 %
 % If IEEEtran.cls has not been installed into the LaTeX system files,
 % manually specify the path to it like:
@@ -747,7 +747,7 @@ The fingerprints are stored in a local malware fingerprint database for easy acc
 \State ${GV}_O\gets[]; {GV}_C\gets[]$
 \State ${Database}\gets[]$
    \ForAll{Capture$_i\gets$Malware captures}
-   	\State \Call{Append To}{${GV}_O\gets$[$\Delta_1,\Delta_2,...,\Delta_k$]}
+   	\State \Call{Append to}{${GV}_O\gets$[$\Delta_1,\Delta_2,...,\Delta_k$]}
    \EndFor
    \State ${GV}_C\gets$\Call{K-Means++}{${GV}_O$}
 
@@ -759,7 +759,7 @@ The fingerprints are stored in a local malware fingerprint database for easy acc
    	\State Map each quantized value  into a corresponding
    	\NoNumber{letter from the Latin alphabet ($a$,$b$,$c$,...)}
    	\State ${Tree}_i\gets$\Call{LZ78 Tree Generation}{ [$c_1$,$c_2$,$c_3$,...]}
-    \State \Call{Append to}${Database}\gets{Tree}_i$ \label{alg:training:append_db}
+    \State \Call{Append to}{${Database}\gets{Tree}_i$} \label{alg:training:append_db}
    \EndFor
    \State \textbf{return} $Database$
 \EndProcedure
